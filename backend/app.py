@@ -21,6 +21,7 @@ CORS(app)
 # Set JWT secret key
 app.config['JWT_SECRET'] = os.getenv('JWT_SECRET', 'your-secret-key-change-this-in-production')
 
+
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(chat_bp, url_prefix='/api/chat')
@@ -70,8 +71,8 @@ def chat():
             datetime_info = get_current_datetime()
             response_text = get_ai_response(f"{message}. Hiện tại là {datetime_info['datetime']}", lang)
         else:
-            # Use RAG for tourism queries
-            response_text = ask_question(message)
+            # Use RAG for tourism queries with language support
+            response_text = ask_question(message, lang)
         
         return jsonify({
             'status': 'success', 
@@ -103,8 +104,8 @@ def chat_authenticated(current_user_id):
             datetime_info = get_current_datetime()
             response_text = get_ai_response(f"{message}. Hiện tại là {datetime_info['datetime']}", lang)
         else:
-            # Use RAG for tourism queries
-            response_text = ask_question(message)
+            # Use RAG for tourism queries with language support
+            response_text = ask_question(message, lang)
         
         # Save to chat history if conversation_id is provided
         if conversation_id:

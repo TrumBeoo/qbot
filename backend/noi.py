@@ -27,18 +27,17 @@ def detect_language(text: str) -> str:
     """Detect language for given text, fallback to vi/en heuristic."""
     try:
         detected = detect(text)
+        print(f"langdetect result: {detected}")
         # Map common language codes to supported ones
         if detected in ['vi', 'vietnamese']:
             return 'vi'
         elif detected in ['en', 'english']:
             return 'en'
         else:
-            # Fallback to character-based detection
-            vietnamese_chars = 'àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ'
-            if any(char in text.lower() for char in vietnamese_chars):
-                return 'vi'
-            return 'en'
-    except Exception:
+            # Use fallback detection for uncertain cases
+            return _fallback_language_detection(text)
+    except Exception as e:
+        print(f"langdetect failed: {e}, using fallback")
         return _fallback_language_detection(text)
 
 def _fallback_language_detection(text: str) -> str:
@@ -51,23 +50,35 @@ def _fallback_language_detection(text: str) -> str:
         return 'vi'
     
     # Common Vietnamese words
-    vietnamese_words = ['tôi', 'bạn', 'chúng', 'của', 'trong', 'một', 'có', 'được', 'này', 'đó', 'là', 'và', 'với', 'cho', 'về', 'du lịch', 'quảng ninh', 'hạ long']
-    # Common English words
-    english_words = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'this', 'that', 'is', 'are', 'what', 'where', 'how', 'can', 'could', 'would', 'travel', 'tourism', 'quang ninh', 'ha long']
+    vietnamese_words = ['tôi', 'bạn', 'chúng', 'của', 'trong', 'một', 'có', 'được', 'này', 'đó', 'là', 'và', 'với', 'cho', 'về', 'du lịch', 'quảng ninh', 'hạ long', 'xin chào', 'cảm ơn', 'vịnh', 'thành phố']
+    # Common English words and phrases
+    english_words = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'this', 'that', 'is', 'are', 'what', 'where', 'how', 'can', 'could', 'would', 'travel', 'tourism', 'quang ninh', 'ha long', 'hello', 'thank you', 'bay', 'city']
     
     # Count word matches
     vi_score = sum(1 for word in vietnamese_words if word in text_lower)
     en_score = sum(1 for word in english_words if word in text_lower)
     
-    # English patterns
-    english_patterns = ['what', 'where', 'how', 'can you', 'could you', 'would you', 'tell me', 'show me']
-    if any(pattern in text_lower for pattern in english_patterns):
+    # Strong English indicators
+    english_patterns = ['what', 'where', 'how', 'can you', 'could you', 'would you', 'tell me', 'show me', 'hello', 'hi ', 'thanks', 'please']
+    for pattern in english_patterns:
+        if pattern in text_lower:
+            en_score += 3
+    
+    # Strong Vietnamese indicators
+    vietnamese_patterns = ['bạn có thể', 'cho tôi biết', 'giới thiệu', 'hãy', 'làm sao', 'xin chào', 'cảm ơn', 'vui lòng']
+    for pattern in vietnamese_patterns:
+        if pattern in text_lower:
+            vi_score += 3
+    
+    # Check for English sentence structure
+    if any(text_lower.startswith(start) for start in ['what ', 'where ', 'how ', 'can ', 'could ', 'would ', 'do you', 'are you']):
         en_score += 2
     
-    # Vietnamese patterns  
-    vietnamese_patterns = ['bạn có thể', 'cho tôi biết', 'giới thiệu', 'hãy', 'làm sao']
-    if any(pattern in text_lower for pattern in vietnamese_patterns):
+    # Check for Vietnamese sentence structure
+    if any(text_lower.startswith(start) for start in ['bạn ', 'tôi ', 'làm ', 'có ', 'được ']):
         vi_score += 2
+    
+    print(f"Language detection - Text: '{text}' | VI score: {vi_score} | EN score: {en_score}")
     
     return 'en' if en_score > vi_score else 'vi'
 

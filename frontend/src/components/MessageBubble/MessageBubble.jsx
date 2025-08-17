@@ -20,10 +20,14 @@ import {
 } from 'react-icons/fa';
 import { useState } from 'react';
 import { translations } from '../../constants';
+import TypingText from '../Typing/TypingText';
 
 const MessageBubble = ({ message, language, config }) => {
   const [isCopied, setIsCopied] = useState(false);
+  const [showActions, setShowActions] = useState(false);
+  const [hasTyped, setHasTyped] = useState(false);
   const isUser = message.sender === 'user';
+  const isNewMessage = message.timestamp && (Date.now() - new Date(message.timestamp).getTime()) < 5000 && !hasTyped;
   
   // User message colors (keep original bubble design)
   const userBgColor = useColorModeValue('blue.500', 'blue.600');
@@ -145,6 +149,18 @@ const MessageBubble = ({ message, language, config }) => {
                <Box fontSize="sm" lineHeight="1.6" color={botTextColor} p={4}>
                  {formatMessageText(message.text)}
                </Box>
+             ) : isNewMessage ? (
+               <Box px={4} py={3}>
+                 <TypingText
+                   text={message.text}
+                   speed={15}
+                   color={botTextColor}
+                   onDone={() => {
+                     setShowActions(true);
+                     setHasTyped(true);
+                   }}
+                 />
+               </Box>
              ) : (
                <Text
                   whiteSpace="pre-wrap"
@@ -157,14 +173,13 @@ const MessageBubble = ({ message, language, config }) => {
                 >
                   {message.text}
                 </Text>
-
              )}
            </Box>
          )}
 
          {/* Message Actions */}
-         {!message.isLoading && (
-           <HStack spacing={1} justify="flex" opacity={1} _hover={{ opacity: 5 }}>
+         {!message.isLoading && (showActions || !isNewMessage) && (
+           <HStack spacing={1} justify="flex" opacity={0.7} _hover={{ opacity: 1 }}>
              <IconButton
                icon={isCopied ? <FaThumbsUp /> : <FaCopy />}
                ml="10px"

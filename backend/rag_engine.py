@@ -26,7 +26,7 @@ class RAGEngine:
                  data_dir: str = "data/", 
                  vectorstore_path: str = "vectorstore/index",
                  embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
-                 llm_model: str = "llama3-8b-8192",
+                 llm_model: str = "llama3-70b-8192",
                  chunk_size: int = 1000,
                  chunk_overlap: int = 200,
                  temperature: float = 0.7):
@@ -212,86 +212,114 @@ class RAGEngine:
         
         return self.vectorstore
     
-    def _create_custom_prompt(self) -> PromptTemplate:
-        """Create custom prompt template for tourism Q&A."""
-        template = """
-        Bạn là một trợ lý du lịch thông minh của tỉnh Quảng Ninh, Việt Nam. Bạn tên là QBot.
-                Khi được hỏi bằng tiếng Việt, bạn phải trả lời bằng tiếng Việt. 
-                Bạn chỉ trả lời các câu hỏi liên quan đến du lịch như: địa điểm tham quan, lịch trình, 
-                khách sạn, nhà hàng, ẩm thực địa phương, văn hóa, lịch sử, giao thông, thời tiết, 
-                chi phí du lịch, hoạt động giải trí, v.v. 
-                
-                Phạm vi trả lời của bạn CHỈ giới hạn trong các địa phương và các địa điểm du lịch tỉnh Quảng Ninh (bao gồm Hạ Long, Cẩm Phả, 
-                Móng Cái, Đông Triều, Quảng Yên, v.v.). 
-                
-                Nếu câu hỏi không liên quan đến du lịch hoặc nằm ngoài tỉnh Quảng Ninh, hãy lịch sự 
-                từ chối và gợi ý người dùng hỏi về du lịch tại Quảng Ninh.
-                
-                Hãy trả lời một cách thân thiện, nhiệt tình và cung cấp thông tin hữu ích.
+    def _create_custom_prompt(self, language: str = 'vi') -> PromptTemplate:
+        """Create custom prompt template for tourism Q&A based on language."""
+        if language == 'en':
+            template = """
+            You are a smart travel assistant specializing in Quang Ninh Province, Vietnam. Your name is QBot.
+            When asked in English, you MUST respond in English.
+            You only answer questions related to travel such as: tourist destinations, itineraries, 
+            hotels, restaurants, local cuisine, culture, history, transportation, weather, 
+            travel costs, entertainment activities, etc.
+            
+            Your answers are STRICTLY limited to Quang Ninh Province (including Ha Long, Cam Pha, 
+            Mong Cai, Dong Trieu, Quang Yen, etc.).
+            
+            If the question is not travel-related or is outside Quang Ninh Province, politely 
+            decline and suggest asking about travel in Quang Ninh.
+            
+            Please respond in a friendly, enthusiastic manner and provide useful information.
 
-        Thông tin liên quan:
-        {context}
+            Relevant information:
+            {context}
 
-        Câu hỏi: {question}
+            Question: {question}
 
-        Hướng dẫn trả lời:
-        - Trả lời bằng tiếng Việt nếu câu hỏi bằng tiếng Việt
-        - Trả lời bằng tiếng Anh nếu câu hỏi bằng tiếng Anh
-        - Cung cấp thông tin chính xác và cụ thể
-        - Nếu không có thông tin trong tài liệu, hãy thông báo rõ ràng
-        - Đưa ra lời khuyên thực tế cho du khách
+            Response guidelines:
+            - Respond in English
+            - Provide accurate and specific information
+            - If no information is available in the documents, clearly state so
+            - Give practical advice for travelers
 
-        Câu trả lời:
-        """
+            Answer:
+            """
+        else:
+            template = """
+            Bạn là một trợ lý du lịch thông minh của tỉnh Quảng Ninh, Việt Nam. Bạn tên là QBot.
+            Khi được hỏi bằng tiếng Việt, bạn phải trả lời bằng tiếng Việt.
+            Bạn chỉ trả lời các câu hỏi liên quan đến du lịch như: địa điểm tham quan, lịch trình, 
+            khách sạn, nhà hàng, ẩm thực địa phương, văn hóa, lịch sử, giao thông, thời tiết, 
+            chi phí du lịch, hoạt động giải trí, v.v.
+            
+            Phạm vi trả lời của bạn CHỈ giới hạn trong các địa phương và các địa điểm du lịch tỉnh Quảng Ninh (bao gồm Hạ Long, Cẩm Phả, 
+            Móng Cái, Đông Triều, Quảng Yên, v.v.).
+            
+            Nếu câu hỏi không liên quan đến du lịch hoặc nằm ngoài tỉnh Quảng Ninh, hãy lịch sự 
+            từ chối và gợi ý người dùng hỏi về du lịch tại Quảng Ninh.
+            
+            Hãy trả lời một cách thân thiện, nhiệt tình và cung cấp thông tin hữu ích.
+
+            Thông tin liên quan:
+            {context}
+
+            Câu hỏi: {question}
+
+            Hướng dẫn trả lời:
+            - Trả lời bằng tiếng Việt
+            - Cung cấp thông tin chính xác và cụ thể
+            - Nếu không có thông tin trong tài liệu, hãy thông báo rõ ràng
+            - Đưa ra lời khuyên thực tế cho du khách
+
+            Câu trả lời:
+            """
         
         return PromptTemplate(
             template=template,
             input_variables=["context", "question"]
         )
     
-    def _load_qa_chain(self) -> RetrievalQA:
-        """Load QA chain with caching and custom prompt."""
-        if self._qa_chain is None:
-            try:
-                vectorstore = self._load_vectorstore()
-                retriever = vectorstore.as_retriever(
-                    search_kwargs={"k": 5}  # Return top 5 relevant chunks
-                )
-                
-                llm = self._get_llm()
-                custom_prompt = self._create_custom_prompt()
-                
-                self._qa_chain = RetrievalQA.from_chain_type(
-                    llm=llm,
-                    chain_type="stuff",
-                    retriever=retriever,
-                    return_source_documents=True,
-                    chain_type_kwargs={"prompt": custom_prompt}
-                )
-                
-                logger.info("QA chain loaded successfully")
-                
-            except Exception as e:
-                raise RuntimeError(f"Failed to load QA chain: {e}")
-        
-        return self._qa_chain
+    def _load_qa_chain(self, language: str = 'vi') -> RetrievalQA:
+        """Load QA chain with caching and custom prompt for specific language."""
+        try:
+            vectorstore = self._load_vectorstore()
+            retriever = vectorstore.as_retriever(
+                search_kwargs={"k": 5}  # Return top 5 relevant chunks
+            )
+            
+            llm = self._get_llm()
+            custom_prompt = self._create_custom_prompt(language)
+            
+            qa_chain = RetrievalQA.from_chain_type(
+                llm=llm,
+                chain_type="stuff",
+                retriever=retriever,
+                return_source_documents=True,
+                chain_type_kwargs={"prompt": custom_prompt}
+            )
+            
+            logger.info(f"QA chain loaded successfully for language: {language}")
+            return qa_chain
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to load QA chain: {e}")
     
-    def ask_question(self, query: str, return_sources: bool = False) -> str:
+    def ask_question(self, query: str, language: str = 'vi', return_sources: bool = False) -> str:
         """
         Ask a question and get response from RAG system.
         
         Args:
             query: User question
+            language: Language for response ('vi' or 'en')
             return_sources: Whether to include source information
             
         Returns:
             Answer string or dict with sources if return_sources=True
         """
         if not query.strip():
-            return "Vui lòng cung cấp câu hỏi hợp lệ."
+            return "Vui lòng cung cấp câu hỏi hợp lệ." if language == 'vi' else "Please provide a valid question."
         
         try:
-            chain = self._load_qa_chain()
+            chain = self._load_qa_chain(language)
             result = chain({"query": query})
             
             answer = result.get("result", "")
@@ -314,7 +342,8 @@ class RAGEngine:
             
         except Exception as e:
             logger.error(f"Error processing question: {e}")
-            return f"Xin lỗi, đã xảy ra lỗi khi xử lý câu hỏi của bạn: {str(e)}"
+            error_msg = f"Xin lỗi, đã xảy ra lỗi khi xử lý câu hỏi của bạn: {str(e)}" if language == 'vi' else f"Sorry, an error occurred while processing your question: {str(e)}"
+            return error_msg
     
     def get_stats(self) -> Dict[str, Any]:
         """Get statistics about the RAG system."""
@@ -350,5 +379,5 @@ def get_rag_engine() -> RAGEngine:
 def create_vector_store():
     return get_rag_engine().create_vector_store()
 
-def ask_question(query: str) -> str:
-    return get_rag_engine().ask_question(query)
+def ask_question(query: str, language: str = 'vi') -> str:
+    return get_rag_engine().ask_question(query, language)
