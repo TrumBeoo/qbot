@@ -194,17 +194,35 @@ const WelcomeScreen = ({
     }
   }, [authMode, formData, language, onRegister, onLogin, onClose, resetForm]);
 
-  // Social login handlers (disabled)
+  // Social login handlers
   const handleGoogleSuccess = useCallback(async (credentialResponse) => {
-    showToast('Google Login', 'API functionality has been disabled', 'info');
-  }, [showToast]);
+    setIsLoading(true);
+    try {
+      await onSocialLogin('google', credentialResponse.credential);
+      onClose();
+      resetForm();
+    } catch (error) {
+      // Error handling is done in parent component
+    } finally {
+      setIsLoading(false);
+    }
+  }, [onSocialLogin, onClose, resetForm]);
 
   const handleFacebookSuccess = useCallback(async (facebookData) => {
-    showToast('Facebook Login', 'API functionality has been disabled', 'info');
-  }, [showToast]);
+    setIsLoading(true);
+    try {
+      await onSocialLogin('facebook', facebookData.accessToken);
+      onClose();
+      resetForm();
+    } catch (error) {
+      // Error handling is done in parent component
+    } finally {
+      setIsLoading(false);
+    }
+  }, [onSocialLogin, onClose, resetForm]);
 
   const handleSocialLoginError = useCallback((error) => {
-    // Do nothing since APIs are disabled
+    console.error('Social login error:', error);
   }, []);
 
   const handleModalClose = useCallback(() => {
@@ -259,7 +277,6 @@ const WelcomeScreen = ({
           }}
           disabled={isLoading}
           size="md"
-          w="sm"
         />
         <FormErrorMessage>{formErrors.email}</FormErrorMessage>
       </FormControl>
@@ -575,23 +592,17 @@ const WelcomeScreen = ({
           <ModalCloseButton isDisabled={isLoading} />
           
           <ModalBody pb={6}>
-            {/* API Disabled Alert */}
-            <Alert status="info" borderRadius="md" mb={4}>
-              <AlertIcon />
-              <AlertDescription>API functionality has been disabled. Authentication is not available.</AlertDescription>
-            </Alert>
+
 
             <VStack spacing={6}>
-              {/* Social Login Buttons (Disabled) */}
+              {/* Social Login Buttons */}
               <Box width="100%" position="relative">
                 <SocialLoginButtons
                   onGoogleSuccess={handleGoogleSuccess}
                   onFacebookSuccess={handleFacebookSuccess}
                   onError={handleSocialLoginError}
                   language={language}
-                  onLanguageChange={onLanguageChange}
                   isLoading={isLoading}
-                  disabled={true}
                 />
               </Box>
 
@@ -604,24 +615,24 @@ const WelcomeScreen = ({
                 <Divider />
               </HStack>
 
-              {/* Email/Password Form (Disabled) */}
+              {/* Email/Password Form */}
               <Box as="form" onSubmit={handleAuthSubmit} width="100%">
                 <VStack spacing={4}>
                   {renderFormFields()}
 
                   <Button
                     type="submit"
-                    colorScheme="gray"
+                    colorScheme="blue"
                     size="lg"
                     width="100%"
                     mt={4}
-                    isDisabled={true}
-                    onClick={() => showToast('Authentication', 'API functionality has been disabled', 'info')}
+                    isLoading={isLoading}
+                    loadingText={authMode === 'login' ? 'Signing in...' : 'Creating account...'}
                   >
                     {authMode === 'login' 
                       ? (translations[language]?.signIn || "Sign In")
                       : (translations[language]?.createAccount || "Create Account")
-                    } (Disabled)
+                    }
                   </Button>
 
                   {/* Switch Auth Mode */}

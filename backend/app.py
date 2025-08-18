@@ -3,13 +3,12 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import base64
 import os
-from rag_engine import ask_question
-from noi import detect_language, get_ai_response, synthesize_speech_to_bytes
+from RAG.rag_engine import ask_question
+from config.noi import detect_language, get_ai_response, synthesize_speech_to_bytes
 
-from auth import auth_bp, token_required
-from chat_history import chat_bp
-from db import chat_collection
-from bson import ObjectId
+from auth.auth import auth_bp, token_required
+from repositories.chat_history import chat_bp
+from services.chat_service import ChatService
 from datetime import datetime
 import pytz
 
@@ -20,6 +19,18 @@ CORS(app)
 
 # Set JWT secret key
 app.config['JWT_SECRET'] = os.getenv('JWT_SECRET', 'your-secret-key-change-this-in-production')
+
+# Initialize database indexes for better performance
+try:
+    from db import users_collection, chat_collection
+    # Create indexes for better query performance
+    users_collection.create_index('email', unique=True)
+    users_collection.create_index('google_id')
+    users_collection.create_index('facebook_id')
+    chat_collection.create_index([('user_id', 1), ('updated_at', -1)])
+    chat_collection.create_index([('user_id', 1), ('title', 'text'), ('messages.text', 'text')])
+except Exception as e:
+    print(f"Warning: Could not create database indexes: {e}")
 
 
 # Register blueprints
@@ -110,40 +121,13 @@ def chat_authenticated(current_user_id):
         # Save to chat history if conversation_id is provided
         if conversation_id:
             try:
-                if ObjectId.is_valid(conversation_id):
-                    # Check if conversation exists and belongs to user
-                    conversation = chat_collection.find_one({
-                        '_id': ObjectId(conversation_id),
-                        'user_id': ObjectId(current_user_id)
-                    })
-                    
-                    if conversation:
-                        # Add messages to existing conversation
-                        timestamp = datetime.utcnow()
-                        
-                        user_msg = {
-                            '_id': ObjectId(),
-                            'text': message,
-                            'sender': 'user',
-                            'timestamp': timestamp,
-                            'language': lang
-                        }
-                        
-                        bot_msg = {
-                            '_id': ObjectId(),
-                            'text': response_text,
-                            'sender': 'bot',
-                            'timestamp': timestamp,
-                            'language': lang
-                        }
-                        
-                        chat_collection.update_one(
-                            {'_id': ObjectId(conversation_id)},
-                            {
-                                '$push': {'messages': {'$each': [user_msg, bot_msg]}},
-                                '$set': {'updated_at': timestamp}
-                            }
-                        )
+                ChatService.add_message_to_conversation(
+                    conversation_id, 
+                    current_user_id, 
+                    message, 
+                    response_text, 
+                    lang
+                )
             except Exception as e:
                 print(f"Error saving to chat history: {str(e)}")
                 # Continue even if saving fails
@@ -225,38 +209,13 @@ def voice_chat_authenticated(current_user_id):
         # Save to chat history if conversation_id is provided
         if conversation_id:
             try:
-                if ObjectId.is_valid(conversation_id):
-                    conversation = chat_collection.find_one({
-                        '_id': ObjectId(conversation_id),
-                        'user_id': ObjectId(current_user_id)
-                    })
-                    
-                    if conversation:
-                        timestamp = datetime.utcnow()
-                        
-                        user_msg = {
-                            '_id': ObjectId(),
-                            'text': text,
-                            'sender': 'user',
-                            'timestamp': timestamp,
-                            'language': detected_lang
-                        }
-                        
-                        bot_msg = {
-                            '_id': ObjectId(),
-                            'text': response_text,
-                            'sender': 'bot',
-                            'timestamp': timestamp,
-                            'language': detected_lang
-                        }
-                        
-                        chat_collection.update_one(
-                            {'_id': ObjectId(conversation_id)},
-                            {
-                                '$push': {'messages': {'$each': [user_msg, bot_msg]}},
-                                '$set': {'updated_at': timestamp}
-                            }
-                        )
+                ChatService.add_message_to_conversation(
+                    conversation_id, 
+                    current_user_id, 
+                    text, 
+                    response_text, 
+                    detected_lang
+                )
             except Exception as e:
                 print(f"Error saving to chat history: {str(e)}")
         
@@ -276,7 +235,7 @@ def voice_chat_authenticated(current_user_id):
 def get_rag_stats():
     """Get RAG system statistics"""
     try:
-        from rag_engine import get_rag_engine
+        from RAG.rag_engine import get_rag_engine
         stats = get_rag_engine().get_stats()
         return jsonify({
             'status': 'success',
@@ -286,11 +245,11 @@ def get_rag_stats():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/rebuild-vectorstore', methods=['POST'])
-@token_required  # Chỉ admin mới có thể rebuild
+@token_required
 def rebuild_vectorstore(current_user_id):
     """Rebuild vector store (admin only)"""
     try:
-        from rag_engine import get_rag_engine
+        from RAG.rag_engine import get_rag_engine
         get_rag_engine().create_vector_store(force_rebuild=True)
         return jsonify({
             'status': 'success',
@@ -309,7 +268,7 @@ def search_similar():
         if not query:
             return jsonify({'status': 'error', 'message': 'Missing query'}), 400
         
-        from rag_engine import get_rag_engine
+        from RAG.rag_engine import get_rag_engine
         rag = get_rag_engine()
         vectorstore = rag._load_vectorstore()
         

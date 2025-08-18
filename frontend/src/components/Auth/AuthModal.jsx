@@ -127,13 +127,25 @@ const AuthModal = ({
 
     try {
       if (authMode === 'register') {
-        await onRegister(formData);
+        const result = await onRegister(
+          formData.name || '', 
+          formData.email || '', 
+          formData.password || ''
+        );
+        if (result.success) {
+          onClose();
+          resetForm();
+        }
       } else {
-        await onLogin(formData);
+        const result = await onLogin(
+          formData.email || '', 
+          formData.password || ''
+        );
+        if (result.success) {
+          onClose();
+          resetForm();
+        }
       }
-      
-      onClose();
-      resetForm();
     } catch (error) {
       // Error handling is done in parent component
     } finally {
@@ -142,15 +154,37 @@ const AuthModal = ({
   }, [authMode, formData, language, onRegister, onLogin, onClose, resetForm]);
 
   const handleGoogleSuccess = useCallback(async (credentialResponse) => {
-    // API disabled - do nothing
-  }, []);
+    setIsLoading(true);
+    try {
+      const result = await onSocialLogin('google', credentialResponse.credential);
+      if (result.success) {
+        onClose();
+        resetForm();
+      }
+    } catch (error) {
+      // Error handling is done in parent component
+    } finally {
+      setIsLoading(false);
+    }
+  }, [onSocialLogin, onClose, resetForm]);
 
   const handleFacebookSuccess = useCallback(async (facebookData) => {
-    // API disabled - do nothing
-  }, []);
+    setIsLoading(true);
+    try {
+      const result = await onSocialLogin('facebook', facebookData.accessToken);
+      if (result.success) {
+        onClose();
+        resetForm();
+      }
+    } catch (error) {
+      // Error handling is done in parent component
+    } finally {
+      setIsLoading(false);
+    }
+  }, [onSocialLogin, onClose, resetForm]);
 
   const handleSocialLoginError = useCallback((error) => {
-    // API disabled - do nothing
+    console.error('Social login error:', error);
   }, []);
 
   const handleModalClose = useCallback(() => {
@@ -204,7 +238,6 @@ const AuthModal = ({
           }}
           disabled={isLoading}
           size="md"
-          w="sm"
         />
         <FormErrorMessage>{formErrors.email}</FormErrorMessage>
       </FormControl>
@@ -286,14 +319,10 @@ const AuthModal = ({
         <ModalCloseButton isDisabled={isLoading} />
         
         <ModalBody pb={6}>
-          {/* API Disabled Alert */}
-          <Alert status="info" borderRadius="md" mb={4}>
-            <AlertIcon />
-            <AlertDescription>API functionality has been disabled. Authentication is not available.</AlertDescription>
-          </Alert>
+
 
           <VStack spacing={6}>
-            {/* Social Login Buttons (Disabled) */}
+            {/* Social Login Buttons */}
             <Box width="100%" position="relative">
               <SocialLoginButtons
                 onGoogleSuccess={handleGoogleSuccess}
@@ -302,7 +331,6 @@ const AuthModal = ({
                 language={language}
                 onLanguageChange={onLanguageChange}
                 isLoading={isLoading}
-                disabled={true}
               />
             </Box>
 
@@ -315,24 +343,24 @@ const AuthModal = ({
               <Divider />
             </HStack>
 
-            {/* Email/Password Form (Disabled) */}
+            {/* Email/Password Form */}
             <Box as="form" onSubmit={handleAuthSubmit} width="100%">
               <VStack spacing={4}>
                 {renderFormFields()}
 
                 <Button
-                  type="button"
-                  colorScheme="gray"
+                  type="submit"
+                  colorScheme="blue"
                   size="lg"
                   width="100%"
                   mt={4}
-                  isDisabled={true}
-                  onClick={() => {}}
+                  isLoading={isLoading}
+                  loadingText={authMode === 'login' ? 'Signing in...' : 'Creating account...'}
                 >
                   {authMode === 'login' 
                     ? (translations[language]?.signIn || "Sign In")
                     : (translations[language]?.createAccount || "Create Account")
-                  } (Disabled)
+                  }
                 </Button>
 
                 {/* Switch Auth Mode */}

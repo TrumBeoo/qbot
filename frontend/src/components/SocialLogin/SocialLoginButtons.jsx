@@ -1,15 +1,11 @@
 // frontend/src/components/SocialLogin/SocialLoginButtons.jsx
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
   VStack,
   Button,
   Text,
-  HStack,
-  Icon,
   useToast,
-  Box,
 } from '@chakra-ui/react';
-import { FaGoogle, FaFacebook, FaExclamationTriangle } from 'react-icons/fa';
 import { translations } from '../../constants';
 
 const SocialLoginButtons = ({
@@ -17,95 +13,151 @@ const SocialLoginButtons = ({
   onFacebookSuccess,
   onError,
   language,
-  onLanguageChange,
-  isLoading: parentLoading = false,
-  disabled = false,
+  isLoading = false,
 }) => {
   const toast = useToast();
 
-  const showError = useCallback((message) => {
-    toast({
-      title: translations[language].error || 'Lỗi',
-      description: message,
-      status: 'info',
-      duration: 4000,
-      isClosable: true,
-    });
-    onError?.(message);
-  }, [toast, language, onError]);
+  // Load Google Sign-In script
+    useEffect(() => {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
 
-  const handleDisabledClick = useCallback(() => {
-    showError('API functionality has been disabled');
-  }, [showError]);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
-  // Since APIs are disabled, show disabled state
+  // Load Facebook SDK
+  useEffect(() => {
+    window.fbAsyncInit = function() {
+      window.FB.init({
+        appId: import.meta.env.VITE_FACEBOOK_APP_ID,
+        cookie: true,
+        xfbml: true,
+        version: 'v18.0'
+      });
+    };
+
+    const script = document.createElement('script');
+    script.async = true;
+    script.defer = true;
+    script.crossOrigin = 'anonymous';
+    script.src = 'https://connect.facebook.net/en_US/sdk.js';
+    document.body.appendChild(script);
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
+  const handleGoogleLogin = useCallback(() => {
+    if (window.google) {
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+        callback: onGoogleSuccess
+      });
+      
+      // Create a temporary div for the Google button
+      const buttonDiv = document.createElement('div');
+      document.body.appendChild(buttonDiv);
+      
+      window.google.accounts.id.renderButton(buttonDiv, {
+        theme: 'outline',
+        size: 'large',
+        width: '100%'
+      });
+      
+      // Trigger click on the rendered button
+      setTimeout(() => {
+        const googleButton = buttonDiv.querySelector('div[role="button"]');
+        if (googleButton) {
+          googleButton.click();
+        }
+        document.body.removeChild(buttonDiv);
+      }, 100);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Google Sign-In not loaded',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  }, [onGoogleSuccess, toast]);
+
+  const handleFacebookLogin = useCallback(() => {
+    if (window.FB) {
+      window.FB.login((response) => {
+        if (response.authResponse) {
+          onFacebookSuccess(response.authResponse);
+        } else {
+          onError('Facebook login cancelled');
+        }
+      }, { scope: 'email,public_profile' });
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Facebook SDK not loaded',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  }, [onFacebookSuccess, onError, toast]);
+
   return (
     <VStack spacing={3} width="100%">
-      <Text fontSize="sm" color="gray.400" textAlign="center">
-        {translations[language].orUseEmail || 'or use email'}
-      </Text>
-
-      <Box textAlign="center" p={4}>
-        <HStack justify="center" spacing={2} mb={2}>
-          <Icon as={FaExclamationTriangle} color="orange.400" />
-          <Text fontSize="sm" color="orange.400">
-            {translations[language].socialLoginNotConfigured || 
-             'Social login not configured'}
-          </Text>
-        </HStack>
-        <Text fontSize="xs" color="gray.500">
-          API functionality has been disabled
-        </Text>
-      </Box>
-
-      {/* Disabled Google Login Button */}
-      
+      {/* Google Login Button */}
       <Button
         width="100%"
         size="lg"
         variant="outline"
         borderColor="gray.300"
         fontFamily="Inter"
-        bg="gray.100"
-        color="gray.400"
+        bg="white"
+        color="gray.700"
         fontWeight="medium"
-        isDisabled={true}
-        onClick={handleDisabledClick}
+        isLoading={isLoading}
+        onClick={handleGoogleLogin}
         leftIcon={
           <img
             src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
             alt='Google'
-            width="25"
+            width="20"
             height="20"
-            style={{ marginRight: 3, opacity: 0.5 }}
           />
         }
+        _hover={{ bg: 'gray.50' }}
       >
-        {translations[language].loginWithGoogle} (Disabled)
+        {translations[language]?.loginWithGoogle || 'Continue with Google'}
       </Button>
 
-      {/* Disabled Facebook Login Button */}
+      {/* Facebook Login Button */}
       <Button
         leftIcon={
           <img
             src="https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png"
             alt="Facebook"
-            width="25"
+            width="20"
             height="20"
-            style={{ opacity: 0.5 }}
           />
         }
         variant="outline"
         size="lg"
         width="100%"
-        onClick={handleDisabledClick}
-        isDisabled={true}
-        borderColor="gray.300"
-        color="gray.400"
-        bg="gray.100"
+        onClick={handleFacebookLogin}
+        isLoading={isLoading}
+        borderColor="#1877F2"
+        color="#1877F2"
+        bg="white"
         fontWeight="medium"
+        _hover={{ bg: 'blue.50' }}
       >
-        {translations[language].loginWithFacebook} (Disabled)
+        {translations[language]?.loginWithFacebook || 'Continue with Facebook'}
       </Button>
     </VStack>
   );

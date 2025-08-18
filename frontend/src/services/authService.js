@@ -23,9 +23,9 @@ class AuthService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          password
+          name: (name || '').trim(),
+          email: (email || '').trim().toLowerCase(),
+          password: password || ''
         })
       });
 
@@ -62,8 +62,8 @@ class AuthService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          password
+          email: (email || '').trim().toLowerCase(),
+          password: password || ''
         })
       });
 

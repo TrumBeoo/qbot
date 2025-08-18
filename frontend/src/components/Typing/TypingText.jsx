@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Text } from '@chakra-ui/react';
 import './TypingText.css';
 
-function TypingText({ text, speed = 30, chunkSize = 5, onDone, ...textProps }) {
+function TypingText({ text, speed = 30, chunkSize = 3, onDone, ...textProps }) {
   const [displayedText, setDisplayedText] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const timeoutRef = useRef(null);

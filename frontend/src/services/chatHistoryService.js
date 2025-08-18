@@ -272,6 +272,30 @@ class ChatHistoryService {
       isError: message.isError || false
     };
   }
+
+  // Get conversation statistics
+  async getConversationStats() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/stats`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get stats');
+      }
+
+      return {
+        success: true,
+        stats: data
+      };
+    } catch (error) {
+      console.error('Get stats error:', error);
+      throw new Error(error.message || 'Failed to get stats');
+    }
+  }
 }
 
 // Create and export singleton instance

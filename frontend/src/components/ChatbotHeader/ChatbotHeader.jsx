@@ -36,7 +36,6 @@ const ChatHeader = ({
   onLanguageChange,
   onToggleSidebar,
   user,
-  onLogout,
   onLogin,
   onRegister,
   onSocialLogin,
@@ -111,26 +110,7 @@ const ChatHeader = ({
               {translations[language].languageSwitch}
             </Button>
 
-            {user ? (
-              <Menu>
-                <MenuButton as={Button} variant="ghost" size="sm">
-                  <HStack spacing={2}>
-                    <Avatar size="sm" name={user.name} src={user.avatar} />
-                    <Text fontSize="sm">{user.name}</Text>
-                    <FaChevronDown size="12px" />
-                  </HStack>
-                </MenuButton>
-                <MenuList>
-                  <MenuItem icon={<FaUser />}>
-                    {translations[language].profile || "Hồ sơ"}
-                  </MenuItem>
-                  <MenuDivider />
-                  <MenuItem icon={<FaSignOutAlt />} onClick={onLogout} color="red.500">
-                    {translations[language].logout || "Đăng xuất"}
-                  </MenuItem>
-                </MenuList>
-              </Menu>
-            ) : (
+            {!user && (
               <Button
                 leftIcon={<FaUser />}
                 colorScheme="blue"

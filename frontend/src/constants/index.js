@@ -94,6 +94,20 @@ export const translations = {
     playAudio: 'Phát âm thanh',
     apiDisabled: 'Chức năng API đã bị vô hiệu hóa. Đây là phản hồi demo.',
     
+    // Chat history
+    chatHistory: 'Lịch sử chat',
+    newChat: 'Cuộc trò chuyện mới',
+    newConversation: 'Cuộc trò chuyện mới',
+    noConversations: 'Chưa có cuộc trò chuyện nào',
+    rename: 'Đổi tên',
+    delete: 'Xóa',
+    deleteConversation: 'Xóa cuộc trò chuyện',
+    profile: 'Hồ sơ',
+    messages: 'tin nhắn',
+    today: 'Hôm nay',
+    yesterday: 'Hôm qua',
+    daysAgo: 'ngày trước',
+    
     // Theme
     darkMode: 'Chế độ tối',
     lightMode: 'Chế độ sáng',
@@ -206,6 +220,20 @@ export const translations = {
     copyMessage: 'Copy message',
     playAudio: 'Play audio',
     apiDisabled: 'API functionality has been disabled. This is a demo response.',
+    
+    // Chat history
+    chatHistory: 'Chat History',
+    newChat: 'New Chat',
+    newConversation: 'New Conversation',
+    noConversations: 'No conversations yet',
+    rename: 'Rename',
+    delete: 'Delete',
+    deleteConversation: 'Delete conversation',
+    profile: 'Profile',
+    messages: 'messages',
+    today: 'Today',
+    yesterday: 'Yesterday',
+    daysAgo: 'days ago',
     
     // Theme
     darkMode: 'Dark Mode',

@@ -7,17 +7,28 @@ import {
   IconButton,
   Tooltip,
   useColorModeValue,
+  Input,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  useDisclosure,
 } from '@chakra-ui/react';
-import { FaTrash, FaComment } from 'react-icons/fa';
+import { FaTrash, FaComment, FaEdit, FaEllipsisV } from 'react-icons/fa';
 import { translations } from '../../constants';
+import { useState } from 'react';
 
 const ConversationItem = ({
   conversation,
   isActive,
   onSelect,
   onDelete,
+  onRename,
   language,
 }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(conversation.title || '');
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const bgColor = useColorModeValue(
     isActive ? 'blue.50' : 'transparent',
     isActive ? 'blue.900' : 'transparent'
@@ -59,15 +70,40 @@ const ConversationItem = ({
       <HStack spacing={3} align="start">
         <FaComment color={isActive ? '#3182CE' : '#A0AEC0'} />
         <VStack align="start" spacing={1} flex="1" minW="0">
-          <Text
-            fontSize="sm"
-            fontWeight={isActive ? 'semibold' : 'medium'}
-            color={isActive ? 'blue.600' : 'gray.800'}
-            isTruncated
-            maxW="full"
-          >
-            {conversation.title || translations[language].newConversation || 'Cuộc trò chuyện mới'}
-          </Text>
+          {isEditing ? (
+            <Input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={() => {
+                if (editTitle.trim() && editTitle !== conversation.title) {
+                  onRename(conversation._id, editTitle.trim());
+                }
+                setIsEditing(false);
+              }}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  if (editTitle.trim() && editTitle !== conversation.title) {
+                    onRename(conversation._id, editTitle.trim());
+                  }
+                  setIsEditing(false);
+                }
+              }}
+              size="sm"
+              fontSize="sm"
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <Text
+              fontSize="sm"
+              fontWeight={isActive ? 'semibold' : 'medium'}
+              color={isActive ? 'blue.600' : 'gray.800'}
+              isTruncated
+              maxW="full"
+            >
+              {conversation.title || translations[language].newConversation || 'Cuộc trò chuyện mới'}
+            </Text>
+          )}
           <Text fontSize="xs" color="gray.500">
             {formatDate(conversation.updated_at)}
           </Text>
@@ -77,20 +113,40 @@ const ConversationItem = ({
             </Text>
           )}
         </VStack>
-        <Tooltip label={translations[language].deleteConversation || 'Xóa cuộc trò chuyện'}>
-          <IconButton
-            icon={<FaTrash />}
+        <Menu isOpen={isOpen} onOpen={onOpen} onClose={onClose}>
+          <MenuButton
+            as={IconButton}
+            icon={<FaEllipsisV />}
             size="xs"
             variant="ghost"
-            colorScheme="red"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(conversation.id);
-            }}
+            onClick={(e) => e.stopPropagation()}
             opacity={0.7}
             _hover={{ opacity: 1 }}
           />
-        </Tooltip>
+          <MenuList>
+            <MenuItem
+              icon={<FaEdit />}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+                onClose();
+              }}
+            >
+              {translations[language].rename || 'Đổi tên'}
+            </MenuItem>
+            <MenuItem
+              icon={<FaTrash />}
+              color="red.500"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(conversation._id);
+                onClose();
+              }}
+            >
+              {translations[language].delete || 'Xóa'}
+            </MenuItem>
+          </MenuList>
+        </Menu>
       </HStack>
     </Box>
   );
@@ -101,6 +157,7 @@ const ConversationList = ({
   currentConversation,
   onSelectConversation,
   onDeleteConversation,
+  onRenameConversation,
   language,
 }) => {
   if (!conversations || conversations.length === 0) {
@@ -117,11 +174,12 @@ const ConversationList = ({
     <VStack spacing={0} align="stretch">
       {conversations.map((conversation) => (
         <ConversationItem
-          key={conversation.id}
+          key={conversation._id}
           conversation={conversation}
-          isActive={currentConversation?.id === conversation.id}
+          isActive={currentConversation?._id === conversation._id}
           onSelect={onSelectConversation}
           onDelete={onDeleteConversation}
+          onRename={onRenameConversation}
           language={language}
         />
       ))}

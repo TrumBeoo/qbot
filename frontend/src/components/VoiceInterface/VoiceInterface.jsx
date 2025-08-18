@@ -15,6 +15,7 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
   const [isPaused, setIsPaused] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [transcript, setTranscript] = useState('');
   const [detectedLanguage, setDetectedLanguage] = useState('vi');
@@ -38,6 +39,7 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
 
   const getStatusText = () => {
     const lang = responseLanguage || detectedLanguage;
+    if (isInitializing) return lang === 'en' ? 'Initializing voice...' : 'Đang khởi tạo giọng nói...';
     if (isPlaying) return lang === 'en' ? 'Playing response...' : 'Đang phát phản hồi...';
     if (isProcessing) return lang === 'en' ? 'Processing your request...' : 'Đang xử lý yêu cầu...';
     if (isRecording) {
@@ -47,23 +49,35 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
     if (sessionActive) {
       return lang === 'en' ? 'Tap microphone to speak' : 'Nhấn micro để nói';
     }
-    return lang === 'en' ? 'Tap the assistant to start' : 'Nhấn vào trợ lý để bắt đầu';
+    return lang === 'en' ? 'Ready to start' : 'Sẵn sàng bắt đầu';
   };
 
   const getLanguageDisplayName = (langCode) => {
     return langCode === 'en' ? 'English' : 'Tiếng Việt';
   };
 
+  // Auto-start session when modal opens
+  useEffect(() => {
+    if (isOpen && !sessionActive && !isInitializing) {
+      // Small delay to ensure modal is fully rendered
+      const timer = setTimeout(() => {
+        startSession();
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, sessionActive, isInitializing]);
+
   // Animation control
   useEffect(() => {
     if (lottieRef.current) {
-      if ((isRecording && !isPaused) || isProcessing || isPlaying) {
+      if ((isRecording && !isPaused) || isProcessing || isPlaying || isInitializing) {
         lottieRef.current.play();
       } else {
         lottieRef.current.pause();
       }
     }
-  }, [isRecording, isPaused, isPlaying, isProcessing]);
+  }, [isRecording, isPaused, isPlaying, isProcessing, isInitializing]);
 
   // Timer control
   useEffect(() => {
@@ -230,6 +244,7 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
 
   const startSession = useCallback(async () => {
     try {
+      setIsInitializing(true);
       await initMic();
       initRecognition();
       
@@ -240,10 +255,14 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
       setResponseLanguage('vi');
       shouldContinueListeningRef.current = true;
       
-      // Start listening immediately
-      setTimeout(() => startListening(), 100);
+      // Start listening immediately after a short delay
+      setTimeout(() => {
+        startListening();
+        setIsInitializing(false);
+      }, 500);
       
     } catch (error) {
+      setIsInitializing(false);
       toast({
         title: 'Microphone Error',
         description: error.message || 'Could not access microphone. Please check permissions.',
@@ -280,6 +299,7 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
     setIsRecording(false);
     setIsProcessing(false);
     setIsPlaying(false);
+    setIsInitializing(false);
     setTranscript('');
     setRecordingTime(0);
     setDetectedLanguage('vi');
@@ -361,6 +381,7 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
           }
         } else {
           // No audio to play, resume listening immediately
+          setIsPlaying(false);
           if (sessionActive && shouldContinueListeningRef.current) {
             setTimeout(() => startListening(), 500);
           }
@@ -412,9 +433,8 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
   };
 
   const handleLottieClick = () => {
-    if (!sessionActive) {
-      startSession();
-    } else if (!isRecording && !isProcessing && !isPlaying) {
+    // Only handle speaking when session is active and not in other states
+    if (sessionActive && !isRecording && !isProcessing && !isPlaying && !isInitializing) {
       startListening();
     }
   };
@@ -426,65 +446,83 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
         <ModalBody p={8}>
           <VStack spacing={6} align="center">
             {/* Session Status */}
-            {sessionActive && (
+            {(sessionActive || isInitializing) && (
               <Badge 
-                colorScheme={sessionActive ? 'green' : 'gray'} 
+                colorScheme={sessionActive ? 'green' : 'blue'} 
                 variant="subtle"
                 px={3} py={1}
                 borderRadius="full"
                 fontSize="sm"
               >
                 <HStack spacing={1}>
-                  <Box w={2} h={2} bg="green.500" borderRadius="full" />
-                  <Text>Session Active</Text>
+                  <Box 
+                    w={2} h={2} 
+                    bg={sessionActive ? 'green.500' : 'blue.500'} 
+                    borderRadius="full" 
+                    className={isInitializing ? 'animate-pulse' : ''}
+                  />
+                  <Text>{isInitializing ? 'Initializing...' : 'Session Active'}</Text>
                 </HStack>
               </Badge>
             )}
 
             {/* Language indicator */}
-            <HStack spacing={2}>
-              <Badge 
-                colorScheme={detectedLanguage === 'en' ? 'blue' : 'green'} 
-                variant="subtle"
-                px={3} py={1}
-                borderRadius="full"
-                fontSize="sm"
-              >
-                <HStack spacing={1}>
-                  <FaLanguage size={12} />
-                  <Text>{getLanguageDisplayName(detectedLanguage)}</Text>
-                </HStack>
-              </Badge>
-              {responseLanguage !== detectedLanguage && (
+            {(sessionActive || isInitializing) && (
+              <HStack spacing={2}>
                 <Badge 
-                  colorScheme="purple" 
-                  variant="outline"
-                  px={2} py={1}
+                  colorScheme={detectedLanguage === 'en' ? 'blue' : 'green'} 
+                  variant="subtle"
+                  px={3} py={1}
                   borderRadius="full"
-                  fontSize="xs"
+                  fontSize="sm"
                 >
-                  Response: {getLanguageDisplayName(responseLanguage)}
+                  <HStack spacing={1}>
+                    <FaLanguage size={12} />
+                    <Text>{getLanguageDisplayName(detectedLanguage)}</Text>
+                  </HStack>
                 </Badge>
-              )}
-            </HStack>
+                {responseLanguage !== detectedLanguage && (
+                  <Badge 
+                    colorScheme="purple" 
+                    variant="outline"
+                    px={2} py={1}
+                    borderRadius="full"
+                    fontSize="xs"
+                  >
+                    Response: {getLanguageDisplayName(responseLanguage)}
+                  </Badge>
+                )}
+              </HStack>
+            )}
 
             {/* Voice Assistant Animation */}
             <Box
               onClick={handleLottieClick}
               transition="all 0.3s ease"
-              _hover={{ transform: 'scale(1.05)' }}
-              _active={{ transform: 'scale(0.95)' }}
-              cursor="pointer"
+              _hover={{ 
+                transform: (sessionActive && !isRecording && !isProcessing && !isPlaying && !isInitializing) ? 'scale(1.05)' : 'scale(1.0)' 
+              }}
+              _active={{ 
+                transform: (sessionActive && !isRecording && !isProcessing && !isPlaying && !isInitializing) ? 'scale(0.95)' : 'scale(1.0)' 
+              }}
+              cursor={(sessionActive && !isRecording && !isProcessing && !isPlaying && !isInitializing) ? "pointer" : "default"}
               borderRadius="full"
-              border={sessionActive ? "3px solid" : "2px solid transparent"}
+              border="3px solid"
               borderColor={
+                isInitializing ? "blue.400" :
                 isRecording ? "green.400" : 
                 isProcessing ? "yellow.400" : 
                 isPlaying ? "blue.400" : 
-                sessionActive ? "gray.400" : "transparent"
+                sessionActive ? "gray.400" : "gray.300"
               }
               p={2}
               position="relative"
+              boxShadow={
+                isInitializing ? "0 0 20px rgba(66, 153, 225, 0.5)" :
+                isRecording ? "0 0 20px rgba(72, 187, 120, 0.5)" :
+                isProcessing ? "0 0 20px rgba(236, 201, 75, 0.5)" :
+                isPlaying ? "0 0 20px rgba(66, 153, 225, 0.5)" : "none"
+              }
             >
               <Lottie
                 lottieRef={lottieRef}
@@ -495,12 +533,13 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
               />
               
               {/* Status indicator overlay */}
-              {sessionActive && (
+              {(sessionActive || isInitializing) && (
                 <Box
                   position="absolute"
                   top={2}
                   right={2}
                   bg={
+                    isInitializing ? "blue.500" :
                     isRecording ? "green.500" :
                     isProcessing ? "yellow.500" :
                     isPlaying ? "blue.500" :
@@ -510,6 +549,7 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
                   borderRadius="full"
                   p={2}
                   boxShadow="md"
+                  className={isInitializing ? 'animate-pulse' : ''}
                 >
                   {isRecording ? <FaMicrophone size={16} /> : <FaMicrophoneSlash size={16} />}
                 </Box>
@@ -553,7 +593,7 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
 
             {/* Control Buttons */}
             <HStack spacing={4}>
-              {sessionActive && (
+              {sessionActive && !isInitializing && (
                 <IconButton
                   icon={isPaused ? <FaPlay /> : <FaPause />}
                   onClick={togglePause}

@@ -24,6 +24,7 @@ yarn-error.log*
 
 
 .env
+.env.example
 
 # ignore frontend
 frontend/.env

@@ -44,14 +44,13 @@ function App() {
     user, 
     login, 
     register, 
-    googleLogin, 
-    facebookLogin, 
+    socialLogin, 
     logout, 
     loading: authLoading 
   } = useAuth();
   
   // States
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(!user);
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem('language') || 'vi';
   });
@@ -77,8 +76,10 @@ function App() {
   // Load conversations when user logs in
   useEffect(() => {
     if (user && !authLoading) {
+      setShowWelcome(false);
       loadConversations();
     } else if (!user) {
+      setShowWelcome(true);
       setConversations([]);
       setCurrentConversation(null);
     }
@@ -215,37 +216,23 @@ function App() {
     }
   }, [register, showToast]);
 
-  const handleGoogleLogin = useCallback(async (googleToken) => {
+  const handleSocialLogin = useCallback(async (provider, token) => {
     try {
-      const result = await googleLogin(googleToken);
+      const result = await socialLogin(provider, token);
       if (result.success) {
-        showToast('Success', 'Logged in with Google successfully!', 'success');
+        showToast('Success', `Logged in with ${provider} successfully!`, 'success');
         return result;
       } else {
-        showToast('Google Login Failed', result.error, 'error');
+        showToast(`${provider} Login Failed`, result.error, 'error');
         throw new Error(result.error);
       }
     } catch (error) {
-      console.error('Google login error:', error);
+      console.error(`${provider} login error:`, error);
       throw error;
     }
-  }, [googleLogin, showToast]);
+  }, [socialLogin, showToast]);
 
-  const handleFacebookLogin = useCallback(async (facebookToken) => {
-    try {
-      const result = await facebookLogin(facebookToken);
-      if (result.success) {
-        showToast('Success', 'Logged in with Facebook successfully!', 'success');
-        return result;
-      } else {
-        showToast('Facebook Login Failed', result.error, 'error');
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      console.error('Facebook login error:', error);
-      throw error;
-    }
-  }, [facebookLogin, showToast]);
+
 
   const handleLogout = useCallback(() => {
     logout();
@@ -429,6 +416,26 @@ function App() {
    }
  }, [user, currentConversation, showToast]);
 
+ const handleRenameConversation = useCallback(async (conversationId, newTitle) => {
+   if (!user || !newTitle.trim()) return;
+   
+   try {
+     await chatHistoryService.updateConversation(conversationId, { title: newTitle.trim() });
+     setConversations(prev => 
+       prev.map(c => c._id === conversationId ? { ...c, title: newTitle.trim() } : c)
+     );
+     
+     if (currentConversation?._id === conversationId) {
+       setCurrentConversation(prev => ({ ...prev, title: newTitle.trim() }));
+     }
+     
+     showToast('Success', 'Conversation renamed successfully', 'success');
+   } catch (error) {
+     console.error('Error renaming conversation:', error);
+     showToast('Error', 'Failed to rename conversation', 'error');
+   }
+ }, [user, currentConversation, showToast]);
+
  // Loading screen during auth initialization
  if (authLoading) {
    return <LoadingScreen message="Initializing..." />;
@@ -443,11 +450,9 @@ function App() {
        onLanguageChange={handleLanguageChange}
        onRegister={handleRegister}
        onLogin={handleLogin}
-       onSocialLogin={handleGoogleLogin}
+       onSocialLogin={handleSocialLogin}
        onLogout={handleLogout}
        user={user}
-       onGoogleLogin={handleGoogleLogin}
-       onFacebookLogin={handleFacebookLogin}
      />
    );
  }
@@ -464,8 +469,11 @@ function App() {
        onSelectConversation={selectConversation}
        onNewConversation={handleNewConversation}
        onDeleteConversation={handleDeleteConversation}
+       onRenameConversation={handleRenameConversation}
        user={user}
        language={language}
+       onLogout={handleLogout}
+       onProfile={() => console.log('Profile clicked')}
      />
 
      {/* Main Chat Area */}
@@ -475,14 +483,11 @@ function App() {
          onLanguageChange={handleLanguageChange}
          onToggleSidebar={toggleSidebar}
          user={user}
-         onLogout={handleLogout}
          onLogin={handleLogin}
          onRegister={handleRegister}
-         onSocialLogin={handleGoogleLogin}
+         onSocialLogin={handleSocialLogin}
          currentConversation={currentConversation}
          config={chatbotConfig}
-         onGoogleLogin={handleGoogleLogin}
-         onFacebookLogin={handleFacebookLogin}
        />
        
        <Flex flex="1" direction="column" overflow="hidden">
@@ -505,6 +510,10 @@ function App() {
                language={language}
                config={chatbotConfig}
                onVoiceClick={handleVoiceClick}
+               onMapClick={() => setInputText('Tôi muốn xem bản đồ các địa điểm du lịch ở Quảng Ninh')}
+               onRouteClick={() => setInputText('Tôi muốn tìm đường từ ')}
+               onLocationClick={() => setInputText('Các địa điểm du lịch gần đây là gì?')}
+               onDirectionClick={() => setInputText('Hướng dẫn đi từ Hà Nội đến Quảng Ninh')}
              />
            </Box>
          </Box>

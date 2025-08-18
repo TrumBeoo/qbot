@@ -41,8 +41,11 @@ const Sidebar = ({
   onSelectConversation,
   onNewConversation,
   onDeleteConversation,
+  onRenameConversation,
   user,
   language,
+  onLogout,
+  onProfile,
 }) => {
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -82,6 +85,7 @@ const Sidebar = ({
                 currentConversation={currentConversation}
                 onSelectConversation={onSelectConversation}
                 onDeleteConversation={onDeleteConversation}
+                onRenameConversation={onRenameConversation}
                 language={language}
               />
             </Box>
@@ -105,11 +109,11 @@ const Sidebar = ({
                     </HStack>
                   </MenuButton>
                   <MenuList>
-                    <MenuItem icon={<FaUser />}>
+                    <MenuItem icon={<FaUser />} onClick={onProfile}>
                       {translations[language].profile || "Hồ sơ"}
                     </MenuItem>
                     <MenuDivider />
-                    <MenuItem icon={<FaSignOutAlt />} color="red.500">
+                    <MenuItem icon={<FaSignOutAlt />} color="red.500" onClick={onLogout}>
                       {translations[language].logout || "Đăng xuất"}
                     </MenuItem>
                   </MenuList>

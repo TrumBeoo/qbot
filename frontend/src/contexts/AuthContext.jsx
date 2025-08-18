@@ -69,34 +69,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const googleLogin = async (googleToken) => {
+  const socialLogin = async (provider, token) => {
     try {
-      const response = await authService.googleLogin(googleToken);
+      let response;
+      if (provider === 'google') {
+        response = await authService.googleLogin(token);
+      } else if (provider === 'facebook') {
+        response = await authService.facebookLogin(token);
+      } else {
+        throw new Error('Unsupported provider');
+      }
+      
       setUser(response.user);
       setToken(response.token);
       localStorage.setItem('token', response.token);
       return { success: true, user: response.user };
     } catch (error) {
-      console.error('Google login failed:', error);
+      console.error(`${provider} login failed:`, error);
       return { 
         success: false, 
-        error: error.message || 'Google login failed' 
-      };
-    }
-  };
-
-  const facebookLogin = async (facebookToken) => {
-    try {
-      const response = await authService.facebookLogin(facebookToken);
-      setUser(response.user);
-      setToken(response.token);
-      localStorage.setItem('token', response.token);
-      return { success: true, user: response.user };
-    } catch (error) {
-      console.error('Facebook login failed:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Facebook login failed' 
+        error: error.message || `${provider} login failed` 
       };
     }
   };
@@ -130,8 +122,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user,
     login,
     register,
-    googleLogin,
-    facebookLogin,
+    socialLogin,
     logout,
     updateProfile
   };

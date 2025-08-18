@@ -7,8 +7,13 @@ import {
   Tooltip,
   Image,
   useColorModeValue,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  Text,
 } from '@chakra-ui/react';
-import { FaPaperPlane, FaPlus } from 'react-icons/fa';
+import { FaPaperPlane, FaPlus, FaMap, FaRoute, FaMapMarkerAlt, FaCompass } from 'react-icons/fa';
 import { HiArrowUp } from "react-icons/hi";
 import { useRef, useEffect } from 'react';
 import { translations } from '../../constants';
@@ -21,7 +26,11 @@ const ChatInput = ({
   language,
   config,
   onVoiceClick,
-  onExtraClick
+  onExtraClick,
+  onMapClick,
+  onRouteClick,
+  onLocationClick,
+  onDirectionClick
 }) => {
  const inputRef = useRef(null);
  const textareaRef = useRef(null);
@@ -94,19 +103,33 @@ const ChatInput = ({
           }}
           transition="all 0.2s"
         >
-         <Tooltip label={translations[language].addExtension}>
-            <IconButton
+         <Menu>
+            <MenuButton
+              as={IconButton}
               icon={<FaPlus />}
               size="sm"
               variant="ghost"
               aria-label="more"
-              onClick={onExtraClick || (() => console.log("Extra clicked"))}
               borderRadius="full"
               mr={2}
               color={textColor}
               _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
             />
-          </Tooltip>
+            <MenuList>
+              <MenuItem onClick={onMapClick} icon={<FaMap />}>
+                <Text>Bản đồ</Text>
+              </MenuItem>
+              <MenuItem onClick={onRouteClick} icon={<FaRoute />}>
+                <Text>Tìm đường</Text>
+              </MenuItem>
+              <MenuItem onClick={onLocationClick} icon={<FaMapMarkerAlt />}>
+                <Text>Địa điểm gần đây</Text>
+              </MenuItem>
+              <MenuItem onClick={onDirectionClick} icon={<FaCompass />}>
+                <Text>Hướng dẫn đi lại</Text>
+              </MenuItem>
+            </MenuList>
+          </Menu>
 
          <Textarea
               ref={textareaRef}
