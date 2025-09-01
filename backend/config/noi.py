@@ -120,7 +120,7 @@ def get_ai_response(user_input: str, detected_lang: str) -> str:
             )
 
         data = {
-            "model": "llama3-70b-8192",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_input}

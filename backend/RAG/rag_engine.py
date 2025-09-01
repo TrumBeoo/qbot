@@ -8,7 +8,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain_groq import ChatGroq
 from langchain.prompts import PromptTemplate
-from langchain.schema import Document
+from langchain.schema import Document                                                       
 from dotenv import load_dotenv
 from RAG.loader import DocumentLoader
 import logging
@@ -26,7 +26,7 @@ class RAGEngine:
                  data_dir: str = "data/", 
                  vectorstore_path: str = "vectorstore/index",
                  embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
-                 llm_model: str = "llama3-70b-8192",
+                 llm_model: str = "llama-3.3-70b-versatile",
                  chunk_size: int = 1000,
                  chunk_overlap: int = 200,
                  temperature: float = 0.7):

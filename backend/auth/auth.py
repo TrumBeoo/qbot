@@ -47,8 +47,9 @@ def register():
         name = data.get('name', '').strip()
         email = data.get('email', '').strip()
         password = data.get('password', '')
+        business_info = data.get('businessInfo')
         
-        result = AuthService.register_user(name, email, password)
+        result = AuthService.register_user(name, email, password, business_info)
         
         return jsonify({
             'message': 'User registered successfully',

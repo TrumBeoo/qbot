@@ -31,7 +31,7 @@ class AuthService:
             raise ValueError('Token is invalid')
     
     @classmethod
-    def register_user(cls, name, email, password):
+    def register_user(cls, name, email, password, business_info=None):
         """Register a new user"""
         # Validate input
         if not name or not email or not password:
@@ -57,7 +57,14 @@ class AuthService:
             'email': email,
             'name': name,
             'provider': 'email',
-            'is_active': True
+            'is_active': True,
+            'business_info': business_info or {
+                'business_name': name,
+                'business_type': 'Du lịch',
+                'industry': 'Tourism',
+                'phone': '',
+                'address': ''
+            }
         }
         
         user = User(user_data)
@@ -86,6 +93,10 @@ class AuthService:
         user = UserRepository.find_by_email(email)
         if not user:
             raise ValueError('Invalid email or password')
+        
+        # Check if user registered with social login
+        if user.provider != 'email':
+            raise ValueError(f'This account was created using {user.provider.title()} login. Please use {user.provider.title()} to sign in.')
         
         # Check password
         if not user.check_password(password):
@@ -160,7 +171,14 @@ class AuthService:
                     'provider': 'google',
                     'profile_picture': profile_picture,
                     'is_active': True,
-                    'last_login': datetime.utcnow()
+                    'last_login': datetime.utcnow(),
+                    'business_info': {
+                        'business_name': name,
+                        'business_type': 'Du lịch',
+                        'industry': 'Tourism',
+                        'phone': '',
+                        'address': ''
+                    }
                 }
                 
                 user = UserRepository.create_user(user_data)
@@ -239,7 +257,14 @@ class AuthService:
                     'provider': 'facebook',
                     'profile_picture': profile_picture,
                     'is_active': True,
-                    'last_login': datetime.utcnow()
+                    'last_login': datetime.utcnow(),
+                    'business_info': {
+                        'business_name': name,
+                        'business_type': 'Du lịch',
+                        'industry': 'Tourism',
+                        'phone': '',
+                        'address': ''
+                    }
                 }
                 
                 user = UserRepository.create_user(user_data)

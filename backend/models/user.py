@@ -18,6 +18,14 @@ class User:
             self.created_at = data.get('created_at', datetime.utcnow())
             self.updated_at = data.get('updated_at', datetime.utcnow())
             self.last_login = data.get('last_login')
+            # Business information for dashboard
+            self.business_info = data.get('business_info', {
+                'business_name': data.get('name', ''),
+                'business_type': 'Du lịch',
+                'industry': 'Tourism',
+                'phone': '',
+                'address': ''
+            })
     
     @staticmethod
     def validate_email(email):
@@ -38,6 +46,8 @@ class User:
     
     def check_password(self, password):
         """Check if password matches"""
+        if self.password is None:
+            return False
         return check_password_hash(self.password, password)
     
     def to_dict(self, include_password=False):
@@ -51,7 +61,8 @@ class User:
             'is_active': self.is_active,
             'created_at': self.created_at,
             'updated_at': self.updated_at,
-            'last_login': self.last_login
+            'last_login': self.last_login,
+            'businessInfo': self.business_info  # For frontend compatibility
         }
         
         if include_password:
@@ -77,5 +88,6 @@ class User:
             'is_active': self.is_active,
             'created_at': self.created_at,
             'updated_at': self.updated_at,
-            'last_login': self.last_login
+            'last_login': self.last_login,
+            'business_info': self.business_info
         }

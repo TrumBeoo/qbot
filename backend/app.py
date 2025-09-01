@@ -103,6 +103,8 @@ def chat_authenticated(current_user_id):
         lang = (data or {}).get('language')
         conversation_id = (data or {}).get('conversation_id')
         
+        print(f"🔍 Received authenticated request: message='{message}', lang='{lang}', conversation_id='{conversation_id}'")
+        
         if not message:
             return jsonify({'status': 'error', 'message': 'Missing message'}), 400
         
@@ -121,15 +123,19 @@ def chat_authenticated(current_user_id):
         # Save to chat history if conversation_id is provided
         if conversation_id:
             try:
-                ChatService.add_message_to_conversation(
+                print(f"💾 Saving to conversation {conversation_id}: user='{message}', bot='{response_text[:50]}...'")
+                result = ChatService.add_message_to_conversation(
                     conversation_id, 
                     current_user_id, 
                     message, 
                     response_text, 
                     lang
                 )
+                print(f"✅ Messages saved successfully: {len(result)} messages")
             except Exception as e:
-                print(f"Error saving to chat history: {str(e)}")
+                print(f"❌ Error saving to chat history: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 # Continue even if saving fails
         
         return jsonify({
@@ -229,7 +235,165 @@ def voice_chat_authenticated(current_user_id):
         print(f"Authenticated voice chat error: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# Thêm vào cuối file app.py, trước if __name__ == '__main__':
+# Dashboard API endpoints for chatbot management
+
+@app.route('/api/dashboard/chatbot-stats', methods=['GET'])
+@token_required
+def get_chatbot_stats(current_user_id):
+    """Get comprehensive chatbot statistics for dashboard"""
+    try:
+        from services.chatbot_service import ChatbotService
+        stats = ChatbotService.get_chatbot_stats()
+        return jsonify({
+            'status': 'success',
+            'data': stats
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/data-sources', methods=['GET'])
+@token_required
+def get_data_sources(current_user_id):
+    """Get list of data sources"""
+    try:
+        from services.chatbot_service import ChatbotService
+        sources = ChatbotService.get_data_sources()
+        return jsonify({
+            'status': 'success',
+            'data': sources
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/data-sources', methods=['POST'])
+@token_required
+def add_data_source(current_user_id):
+    """Add new data source file"""
+    try:
+        data = request.get_json(force=True)
+        filename = (data or {}).get('filename', '').strip()
+        content = (data or {}).get('content', '').strip()
+        
+        if not filename or not content:
+            return jsonify({'status': 'error', 'message': 'Missing filename or content'}), 400
+        
+        from services.chatbot_service import ChatbotService
+        result = ChatbotService.add_data_source(filename, content)
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 400
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/data-sources/<filename>', methods=['GET'])
+@token_required
+def get_file_content(current_user_id, filename):
+    """Get content of a specific data source file"""
+    try:
+        from services.chatbot_service import ChatbotService
+        result = ChatbotService.get_file_content(filename)
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 404
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/data-sources/<filename>', methods=['PUT'])
+@token_required
+def update_data_source(current_user_id, filename):
+    """Update existing data source file"""
+    try:
+        data = request.get_json(force=True)
+        content = (data or {}).get('content', '').strip()
+        
+        if not content:
+            return jsonify({'status': 'error', 'message': 'Missing content'}), 400
+        
+        from services.chatbot_service import ChatbotService
+        result = ChatbotService.update_data_source(filename, content)
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 400
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/data-sources/<filename>', methods=['DELETE'])
+@token_required
+def delete_data_source(current_user_id, filename):
+    """Delete data source file"""
+    try:
+        from services.chatbot_service import ChatbotService
+        result = ChatbotService.delete_data_source(filename)
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 400
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/chatbot-test', methods=['POST'])
+@token_required
+def test_chatbot(current_user_id):
+    """Test chatbot with a query"""
+    try:
+        data = request.get_json(force=True)
+        query = (data or {}).get('query', '').strip()
+        language = (data or {}).get('language', 'vi')
+        
+        if not query:
+            return jsonify({'status': 'error', 'message': 'Missing query'}), 400
+        
+        from services.chatbot_service import ChatbotService
+        result = ChatbotService.test_chatbot(query, language)
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 400
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/rebuild-vectorstore', methods=['POST'])
+@token_required
+def rebuild_vectorstore_dashboard(current_user_id):
+    """Rebuild vector store for dashboard"""
+    try:
+        from services.chatbot_service import ChatbotService
+        result = ChatbotService.rebuild_vectorstore()
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 400
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# Legacy endpoints (keep for backward compatibility)
 
 @app.route('/rag-stats', methods=['GET'])
 def get_rag_stats():
