@@ -37,6 +37,7 @@ const authReducer = (state, action) => {
     case 'LOGOUT':
       return {
         ...state,
+        loading: false,
         isAuthenticated: false,
         user: null,
         token: null,
@@ -62,7 +63,7 @@ export const AuthProvider = ({ children }) => {
           });
         } catch (error) {
           localStorage.removeItem('token');
-          dispatch({ type: 'AUTH_ERROR', payload: 'Token không hợp lệ' });
+          dispatch({ type: 'AUTH_ERROR', payload: null });
         }
       } else {
         dispatch({ type: 'AUTH_ERROR', payload: null });
@@ -82,7 +83,7 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true };
     } catch (error) {
-      const message = error.response?.data?.message || 'Đăng nhập thất bại';
+      const message = error.response?.data?.error || 'Đăng nhập thất bại';
       dispatch({ type: 'AUTH_ERROR', payload: message });
       return { success: false, error: message };
     }
@@ -91,7 +92,22 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     dispatch({ type: 'AUTH_START' });
     try {
-      const response = await authAPI.register(userData);
+      // Transform form data to match backend expectations
+      const registerData = {
+        name: userData.businessName,
+        email: userData.email,
+        password: userData.password,
+        businessInfo: {
+          business_name: userData.businessName,
+          business_type: userData.businessType,
+          industry: 'Tourism',
+          phone: userData.phone,
+          address: `${userData.address}, ${userData.district}, ${userData.city}`,
+          description: userData.description || ''
+        }
+      };
+      
+      const response = await authAPI.register(registerData);
       const { user, token } = response.data;
       
       localStorage.setItem('token', token);
@@ -99,7 +115,41 @@ export const AuthProvider = ({ children }) => {
       
       return { success: true };
     } catch (error) {
-      const message = error.response?.data?.message || 'Đăng ký thất bại';
+      const message = error.response?.data?.error || 'Đăng ký thất bại';
+      dispatch({ type: 'AUTH_ERROR', payload: message });
+      return { success: false, error: message };
+    }
+  };
+
+  const googleLogin = async (googleToken) => {
+    dispatch({ type: 'AUTH_START' });
+    try {
+      const response = await authAPI.googleLogin(googleToken);
+      const { user, token } = response.data;
+      
+      localStorage.setItem('token', token);
+      dispatch({ type: 'AUTH_SUCCESS', payload: { user, token } });
+      
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.error || 'Đăng nhập Google thất bại';
+      dispatch({ type: 'AUTH_ERROR', payload: message });
+      return { success: false, error: message };
+    }
+  };
+
+  const facebookLogin = async (facebookToken) => {
+    dispatch({ type: 'AUTH_START' });
+    try {
+      const response = await authAPI.facebookLogin(facebookToken);
+      const { user, token } = response.data;
+      
+      localStorage.setItem('token', token);
+      dispatch({ type: 'AUTH_SUCCESS', payload: { user, token } });
+      
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.error || 'Đăng nhập Facebook thất bại';
       dispatch({ type: 'AUTH_ERROR', payload: message });
       return { success: false, error: message };
     }
@@ -115,6 +165,8 @@ export const AuthProvider = ({ children }) => {
       ...state,
       login,
       register,
+      googleLogin,
+      facebookLogin,
       logout
     }}>
       {children}

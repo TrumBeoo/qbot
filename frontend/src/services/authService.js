@@ -17,15 +17,30 @@ class AuthService {
   // Register new user
   async register(name, email, password) {
     try {
+      // Validate inputs before sending
+      const trimmedName = (name || '').trim();
+      const trimmedEmail = (email || '').trim().toLowerCase();
+      const trimmedPassword = password || '';
+
+      if (!trimmedName) {
+        throw new Error('Name is required');
+      }
+      if (!trimmedEmail) {
+        throw new Error('Email is required');
+      }
+      if (!trimmedPassword) {
+        throw new Error('Password is required');
+      }
+
       const response = await fetch(`${API_BASE_URL}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: (name || '').trim(),
-          email: (email || '').trim().toLowerCase(),
-          password: password || ''
+          name: trimmedName,
+          email: trimmedEmail,
+          password: trimmedPassword
         })
       });
 
@@ -56,14 +71,25 @@ class AuthService {
   // Login user
   async login(email, password) {
     try {
+      // Validate inputs before sending
+      const trimmedEmail = (email || '').trim().toLowerCase();
+      const trimmedPassword = password || '';
+
+      if (!trimmedEmail) {
+        throw new Error('Email is required');
+      }
+      if (!trimmedPassword) {
+        throw new Error('Password is required');
+      }
+
       const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: (email || '').trim().toLowerCase(),
-          password: password || ''
+          email: trimmedEmail,
+          password: trimmedPassword
         })
       });
 

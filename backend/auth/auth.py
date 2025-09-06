@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from functools import wraps
 from services.auth_service import AuthService
+from services.admin_auth_service import AdminAuthService
 from repositories.user_repository import UserRepository
 
 auth_bp = Blueprint('auth', __name__)
@@ -20,6 +21,16 @@ def token_required(f):
             if token.startswith('Bearer '):
                 token = token[7:]
             
+            # Try admin token first
+            try:
+                admin = AdminAuthService.get_admin_by_token(token)
+                current_user_id = admin['id']
+                return f(current_user_id, *args, **kwargs)
+            except ValueError:
+                # If admin token fails, try regular user token
+                pass
+            
+            # Try regular user token
             user = AuthService.get_user_by_token(token)
             current_user_id = str(user._id)
                 
@@ -66,7 +77,7 @@ def register():
 @auth_bp.route('/login', methods=['POST'])
 @cross_origin()
 def login():
-    """Login user"""
+    """Login user or admin"""
     try:
         data = request.get_json()
         
@@ -76,6 +87,19 @@ def login():
         email = data.get('email', '').strip()
         password = data.get('password', '')
         
+        # Try admin login first
+        try:
+            result = AdminAuthService.login_admin(email, password)
+            return jsonify({
+                'message': 'Admin login successful',
+                'user': result['user'],
+                'token': result['token']
+            }), 200
+        except ValueError:
+            # If admin login fails, try regular user login
+            pass
+        
+        # Try regular user login
         result = AuthService.login_user(email, password)
         
         return jsonify({
@@ -149,7 +173,7 @@ def facebook_login():
 @auth_bp.route('/verify-token', methods=['POST'])
 @cross_origin()
 def verify_token():
-    """Verify JWT token and return user data"""
+    """Verify JWT token and return user/admin data"""
     try:
         token = request.headers.get('Authorization')
         
@@ -160,11 +184,25 @@ def verify_token():
         if token.startswith('Bearer '):
             token = token[7:]
         
+        # Try admin token first
+        try:
+            admin = AdminAuthService.get_admin_by_token(token)
+            return jsonify({
+                'valid': True,
+                'user': admin,
+                'user_type': 'admin'
+            }), 200
+        except ValueError:
+            # If admin token fails, try regular user token
+            pass
+        
+        # Try regular user token
         user = AuthService.get_user_by_token(token)
         
         return jsonify({
             'valid': True,
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'user_type': 'user'
         }), 200
         
     except ValueError as e:

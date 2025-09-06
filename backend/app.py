@@ -22,13 +22,15 @@ app.config['JWT_SECRET'] = os.getenv('JWT_SECRET', 'your-secret-key-change-this-
 
 # Initialize database indexes for better performance
 try:
-    from db import users_collection, chat_collection
+    from db import users_collection, chat_collection, db
     # Create indexes for better query performance
     users_collection.create_index('email', unique=True)
     users_collection.create_index('google_id')
     users_collection.create_index('facebook_id')
     chat_collection.create_index([('user_id', 1), ('updated_at', -1)])
     chat_collection.create_index([('user_id', 1), ('title', 'text'), ('messages.text', 'text')])
+    
+
 except Exception as e:
     print(f"Warning: Could not create database indexes: {e}")
 
@@ -411,7 +413,7 @@ def get_rag_stats():
 @app.route('/rebuild-vectorstore', methods=['POST'])
 @token_required
 def rebuild_vectorstore(current_user_id):
-    """Rebuild vector store (admin only)"""
+    """Rebuild vector store"""
     try:
         from RAG.rag_engine import get_rag_engine
         get_rag_engine().create_vector_store(force_rebuild=True)

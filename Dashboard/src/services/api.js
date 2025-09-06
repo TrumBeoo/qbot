@@ -34,7 +34,9 @@ api.interceptors.response.use(
 export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
-  verifyToken: (token) => api.get('/auth/verify', {
+  googleLogin: (token) => api.post('/auth/google-login', { token }),
+  facebookLogin: (token) => api.post('/auth/facebook-login', { token }),
+  verifyToken: (token) => api.post('/auth/verify-token', {}, {
     headers: { Authorization: `Bearer ${token}` }
   }),
   logout: () => api.post('/auth/logout'),

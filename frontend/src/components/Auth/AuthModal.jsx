@@ -195,7 +195,7 @@ const AuthModal = ({
   }, [isLoading, onClose, resetForm]);
 
   const renderFormFields = useCallback(() => (
-    <VStack spacing={4}>
+    <VStack spacing={4} width="100%" align="stretch" alignItems="flex-start" p={4}>
       {/* Name field for registration */}
       {authMode === 'register' && (
         <FormControl isRequired isInvalid={!!formErrors.name}>

@@ -184,9 +184,9 @@ function App() {
   }, []);
 
   // Authentication handlers
-  const handleLogin = useCallback(async (formData) => {
+  const handleLogin = useCallback(async (email, password) => {
     try {
-      const result = await login(formData.email, formData.password);
+      const result = await login(email, password);
       if (result.success) {
         showToast('Success', 'Logged in successfully!', 'success');
         return result;
@@ -200,9 +200,9 @@ function App() {
     }
   }, [login, showToast]);
 
-  const handleRegister = useCallback(async (formData) => {
+  const handleRegister = useCallback(async (name, email, password) => {
     try {
-      const result = await register(formData.name, formData.email, formData.password);
+      const result = await register(name, email, password);
       if (result.success) {
         showToast('Success', 'Account created successfully!', 'success');
         return result;

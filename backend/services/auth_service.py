@@ -34,8 +34,12 @@ class AuthService:
     def register_user(cls, name, email, password, business_info=None):
         """Register a new user"""
         # Validate input
-        if not name or not email or not password:
-            raise ValueError('Name, email, and password are required')
+        if not name or not name.strip():
+            raise ValueError('Name is required')
+        if not email or not email.strip():
+            raise ValueError('Email is required')
+        if not password:
+            raise ValueError('Password is required')
         
         email = email.strip().lower()
         name = name.strip()
@@ -84,8 +88,10 @@ class AuthService:
     @classmethod
     def login_user(cls, email, password):
         """Login user with email and password"""
-        if not email or not password:
-            raise ValueError('Email and password are required')
+        if not email or not email.strip():
+            raise ValueError('Email is required')
+        if not password:
+            raise ValueError('Password is required')
         
         email = email.strip().lower()
         

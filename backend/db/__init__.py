@@ -13,7 +13,12 @@ client = MongoClient(MONGO_URI)
 
 # Tên database
 mongo_db = client["chatbot_AI"]
+db = mongo_db  # Export db object for other modules
 
 # Expose collections
 users_collection = mongo_db["users"]
 chat_collection = mongo_db["chat_history"]
+messages_collection = mongo_db["messages"]
+admin_user_collection = mongo_db["admins"]
+#dashboard_users_collection = mongo_db["dashboard_users"]
+dashboard_data_collection = mongo_db["dashboard_data"]

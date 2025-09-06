@@ -7,101 +7,23 @@ import {
   HStack,
   Button,
   Text,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalCloseButton,
-  Input,
-  FormControl,
-  FormLabel,
-  FormErrorMessage,
-  useDisclosure,
-  useToast,
-  Divider,
-  Alert,
-  AlertIcon,
-  AlertDescription,
   ScaleFade,
-  useColorModeValue,
 } from '@chakra-ui/react';
-import { FaLanguage, FaPlay, FaUser } from 'react-icons/fa';
+import { FaLanguage, FaPlay } from 'react-icons/fa';
 import Lottie from 'lottie-react';
 import chatbotAnimation from '../../animations/chatbot.json';
 import { translations } from '../../constants';
 import { slideUp, pulse } from '../../styles/animations';
-import SocialLoginButtons from '../SocialLogin/SocialLoginButtons';
 import ThemeToggle from '../ThemeToggle/ThemeToggle';
-import { useTheme } from '../../contexts/ThemeContext';
-
-// Form validation
-const validateForm = (formData, authMode, language) => {
-  const errors = {};
-
-  // Email validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!formData.email) {
-    errors.email = translations[language].emailRequired || 'Email is required';
-  } else if (!emailRegex.test(formData.email)) {
-    errors.email = translations[language].invalidEmail || 'Invalid email format';
-  }
-
-  // Password validation
-  if (!formData.password) {
-    errors.password = translations[language].passwordRequired || 'Password is required';
-  } else if (formData.password.length < 6) {
-    errors.password = translations[language].passwordTooShort || 'Password must be at least 6 characters';
-  }
-
-  // Register mode validations
-  if (authMode === 'register') {
-    if (!formData.name?.trim()) {
-      errors.name = translations[language].nameRequired || 'Name is required';
-    }
-
-    if (!formData.confirmPassword) {
-      errors.confirmPassword = translations[language].confirmPasswordRequired || 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = translations[language].passwordMismatch || 'Passwords do not match';
-    }
-  }
-
-  return errors;
-};
 
 const WelcomeScreen = ({ 
   language, 
   onStart, 
   onLanguageChange, 
-  playWelcomeSound,
-  user,
-  onLogin,
-  onRegister,
-  onLogout,
-  onSocialLogin
+  playWelcomeSound
 }) => {
-  // State management
   const [showGreeting, setShowGreeting] = useState(false);
-  const [authMode, setAuthMode] = useState('login');
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-    name: ''
-  });
-  const [formErrors, setFormErrors] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Hooks
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const toast = useToast();
-
-  // Color mode values
-  const modalBg = useColorModeValue('white', 'gray.800');
-  const modalColor = useColorModeValue('gray.800', 'white');
-
-  // Effects
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowGreeting(true);
@@ -113,29 +35,6 @@ const WelcomeScreen = ({
     return () => clearTimeout(timer);
   }, [playWelcomeSound]);
 
-  // Utility functions
-  const resetForm = useCallback(() => {
-    setFormData({
-      email: '',
-      password: '',
-      confirmPassword: '',
-      name: ''
-    });
-    setFormErrors({});
-  }, []);
-
-  const showToast = useCallback((title, description, status) => {
-    toast({
-      title,
-      description,
-      status,
-      duration: status === 'error' ? 5000 : 3000,
-      isClosable: true,
-      position: 'top',
-    });
-  }, [toast]);
-
-  // Event handlers
   const handleStart = useCallback(() => {
     if (playWelcomeSound) {
       playWelcomeSound();
@@ -145,191 +44,6 @@ const WelcomeScreen = ({
     }, 300);
   }, [onStart, playWelcomeSound]);
 
-  const handleInputChange = useCallback((e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-
-    // Clear specific field error when user starts typing
-    if (formErrors[name]) {
-      setFormErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  }, [formErrors]);
-
-  const switchAuthMode = useCallback(() => {
-    setAuthMode(prevMode => prevMode === 'login' ? 'register' : 'login');
-    resetForm();
-  }, [resetForm]);
-
-  const handleAuthSubmit = useCallback(async (e) => {
-    e.preventDefault();
-    
-    const errors = validateForm(formData, authMode, language);
-    setFormErrors(errors);
-
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      if (authMode === 'register') {
-        await onRegister(formData);
-      } else {
-        await onLogin(formData);
-      }
-      
-      onClose();
-      resetForm();
-    } catch (error) {
-      // Error handling is done in parent component
-    } finally {
-      setIsLoading(false);
-    }
-  }, [authMode, formData, language, onRegister, onLogin, onClose, resetForm]);
-
-  // Social login handlers
-  const handleGoogleSuccess = useCallback(async (credentialResponse) => {
-    setIsLoading(true);
-    try {
-      await onSocialLogin('google', credentialResponse.credential);
-      onClose();
-      resetForm();
-    } catch (error) {
-      // Error handling is done in parent component
-    } finally {
-      setIsLoading(false);
-    }
-  }, [onSocialLogin, onClose, resetForm]);
-
-  const handleFacebookSuccess = useCallback(async (facebookData) => {
-    setIsLoading(true);
-    try {
-      await onSocialLogin('facebook', facebookData.accessToken);
-      onClose();
-      resetForm();
-    } catch (error) {
-      // Error handling is done in parent component
-    } finally {
-      setIsLoading(false);
-    }
-  }, [onSocialLogin, onClose, resetForm]);
-
-  const handleSocialLoginError = useCallback((error) => {
-    console.error('Social login error:', error);
-  }, []);
-
-  const handleModalClose = useCallback(() => {
-    if (!isLoading) {
-      onClose();
-      resetForm();
-    }
-  }, [isLoading, onClose, resetForm]);
-
-  // Render form fields
-  const renderFormFields = useCallback(() => (
-    <VStack spacing={4}>
-      {/* Name field for registration */}
-      {authMode === 'register' && (
-        <FormControl isRequired isInvalid={!!formErrors.name}>
-          <FormLabel>{translations[language].name || "Full Name"}</FormLabel>
-          <Input
-            name="name"
-            type="text"
-            value={formData.name}
-            onChange={handleInputChange}
-            placeholder={translations[language].enterName || "Enter your full name"}
-            bg={useColorModeValue('gray.50', 'gray.700')}
-            border="1px solid"
-            borderColor={useColorModeValue('gray.300', 'gray.600')}
-            _focus={{ 
-              borderColor: 'blue.400',
-              boxShadow: '0 0 0 1px #3182CE'
-            }}
-            disabled={isLoading}
-            size="md"
-          />
-          <FormErrorMessage>{formErrors.name}</FormErrorMessage>
-        </FormControl>
-      )}
-
-      {/* Email field */}
-      <FormControl isRequired isInvalid={!!formErrors.email}>
-        <FormLabel>{translations[language].email || "Email"}</FormLabel>
-        <Input
-          name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleInputChange}
-          placeholder={translations[language].enterEmail || "Enter your email"}
-          bg={useColorModeValue('gray.50', 'gray.700')}
-          border="1px solid"
-          borderColor={useColorModeValue('gray.300', 'gray.600')}
-          _focus={{ 
-            borderColor: 'blue.400',
-            boxShadow: '0 0 0 1px #3182CE'
-          }}
-          disabled={isLoading}
-          size="md"
-        />
-        <FormErrorMessage>{formErrors.email}</FormErrorMessage>
-      </FormControl>
-
-      {/* Password field */}
-      <FormControl isRequired isInvalid={!!formErrors.password}>
-        <FormLabel>{translations[language].password || "Password"}</FormLabel>
-        <Input
-          name="password"
-          type="password"
-          value={formData.password}
-          onChange={handleInputChange}
-          placeholder={translations[language].enterPassword || "Enter your password"}
-          bg={useColorModeValue('gray.50', 'gray.700')}
-          border="1px solid"
-          borderColor={useColorModeValue('gray.300', 'gray.600')}
-          _focus={{ 
-            borderColor: 'blue.400',
-            boxShadow: '0 0 0 1px #3182CE'
-          }}
-          disabled={isLoading}
-          size="md"
-        />
-        <FormErrorMessage>{formErrors.password}</FormErrorMessage>
-      </FormControl>
-
-      {/* Confirm password field for registration */}
-      {authMode === 'register' && (
-        <FormControl isRequired isInvalid={!!formErrors.confirmPassword}>
-          <FormLabel>{translations[language].confirmPassword || "Confirm Password"}</FormLabel>
-          <Input
-            name="confirmPassword"
-            type="password"
-            value={formData.confirmPassword}
-            onChange={handleInputChange}
-            placeholder={translations[language].enterConfirmPassword || "Re-enter your password"}
-            bg={useColorModeValue('gray.50', 'gray.700')}
-            border="1px solid"
-            borderColor={useColorModeValue('gray.300', 'gray.600')}
-            _focus={{ 
-              borderColor: 'blue.400',
-              boxShadow: '0 0 0 1px #3182CE'
-            }}
-            disabled={isLoading}
-            size="md"
-          />
-          <FormErrorMessage>{formErrors.confirmPassword}</FormErrorMessage>
-        </FormControl>
-      )}
-    </VStack>
-  ), [authMode, formData, handleInputChange, language, isLoading, formErrors]);
-
-  // Main content
   return (
     <Box
       minH="100vh"
@@ -378,52 +92,6 @@ const WelcomeScreen = ({
             >
               {translations[language]?.languageSwitch || "Switch Language"}
             </Button>
-
-            {!user ? (
-              <Button
-                leftIcon={<FaUser />}
-                onClick={onOpen}
-                colorScheme="whiteAlpha"
-                bg="blackAlpha.500"
-                variant="solid"
-                size="sm"
-                color="white"
-                borderColor="whiteAlpha.400"
-                _hover={{
-                  borderColor: 'whiteAlpha.600',
-                  bg: 'whiteAlpha.200',
-                  transform: 'translateY(-1px)'
-                }}
-                _active={{ transform: 'translateY(0)' }}
-                transition="all 0.2s"
-              >
-                {translations[language]?.login || "Sign In"}
-              </Button>
-            ) : (
-              <HStack spacing={2}>
-                <Text fontSize="sm" opacity={0.9} fontWeight="medium">
-                  {translations[language]?.welcome || "Welcome"}, {user.name}!
-                </Text>
-                <Button
-                  onClick={onLogout}
-                  colorScheme="whiteAlpha"
-                  bg="blackAlpha.500"
-                  variant="solid"
-                  size="sm"
-                  color="white"
-                  borderColor="whiteAlpha.400"
-                  _hover={{
-                    borderColor: 'whiteAlpha.600',
-                    bg: 'whiteAlpha.200',
-                    transform: 'translateY(-1px)'
-                  }}
-                  _active={{ transform: 'translateY(0)' }}
-                  transition="all 0.2s"
-                >
-                  {translations[language]?.logout || "Sign Out"}
-                </Button>
-              </HStack>
-            )}
           </HStack>
 
           {/* Bot Avatar */}
@@ -512,7 +180,6 @@ const WelcomeScreen = ({
             animationDelay="1.2s"
             animationFillMode="both"
           >
-            {/* Try Button */}
             <Button
               size="lg"
               colorScheme="blue"
@@ -541,129 +208,9 @@ const WelcomeScreen = ({
             >
               {translations[language]?.tryButton || "Try Now"}
             </Button>
-
-            {/* Login/Register prompt for non-users */}
-            {!user && (
-              <Text fontSize="sm" opacity={0.8} textAlign="center">
-                {translations[language]?.loginPrompt || "Sign in to save your chat history and get personalized recommendations!"}
-                <Button
-                  variant="link"
-                  color="blue"
-                  fontSize="sm"
-                  ml={2}
-                  onClick={onOpen}
-                  _hover={{ color: 'blue.50', textDecoration: 'underline' }}
-                  fontWeight="medium"
-                >
-                  {translations[language]?.loginNow || "Sign in now"}
-                </Button>
-              </Text>
-            )}
           </VStack>
         </VStack>
       </Container>
-
-      {/* Enhanced Auth Modal */}
-      <Modal 
-        isOpen={isOpen} 
-        onClose={handleModalClose} 
-        size="md" 
-        closeOnOverlayClick={!isLoading}
-        motionPreset="slideInBottom"
-      >
-        <ModalOverlay backdropFilter="blur(10px)" bg="blackAlpha.600" />
-        <ModalContent bg={modalBg} color={modalColor} borderRadius="xl" mx={4}>
-          <ModalHeader textAlign="center" pb={2}>
-            <VStack spacing={2}>
-              <Text fontSize="2xl" fontWeight="bold">
-                {authMode === 'login' 
-                  ? (translations[language]?.login || "Welcome Back")
-                  : (translations[language]?.register || "Create Account")
-                }
-              </Text>
-              <Text fontSize="sm" color="gray.500" fontWeight="normal">
-                {authMode === 'login'
-                  ? (translations[language]?.loginSubtitle )
-                  : (translations[language]?.registerSubtitle )
-                }
-              </Text>
-            </VStack>
-          </ModalHeader>
-          <ModalCloseButton isDisabled={isLoading} />
-          
-          <ModalBody pb={6}>
-
-
-            <VStack spacing={6}>
-              {/* Social Login Buttons */}
-              <Box width="100%" position="relative">
-                <SocialLoginButtons
-                  onGoogleSuccess={handleGoogleSuccess}
-                  onFacebookSuccess={handleFacebookSuccess}
-                  onError={handleSocialLoginError}
-                  language={language}
-                  isLoading={isLoading}
-                />
-              </Box>
-
-              {/* Divider */}
-              <HStack width="100%">
-                <Divider />
-                <Text fontSize="sm" color="gray.500" px={3} whiteSpace="nowrap">
-                  {translations[language]?.orUseEmail || "or use email"}
-                </Text>
-                <Divider />
-              </HStack>
-
-              {/* Email/Password Form */}
-              <Box as="form" onSubmit={handleAuthSubmit} width="100%">
-                <VStack spacing={4}>
-                  {renderFormFields()}
-
-                  <Button
-                    type="submit"
-                    colorScheme="blue"
-                    size="lg"
-                    width="100%"
-                    mt={4}
-                    isLoading={isLoading}
-                    loadingText={authMode === 'login' ? 'Signing in...' : 'Creating account...'}
-                  >
-                    {authMode === 'login' 
-                      ? (translations[language]?.signIn || "Sign In")
-                      : (translations[language]?.createAccount || "Create Account")
-                    }
-                  </Button>
-
-                  {/* Switch Auth Mode */}
-                  <HStack spacing={1} justify="center" pt={2}>
-                    <Text fontSize="sm" color="gray.500">
-                      {authMode === 'login' 
-                        ? (translations[language]?.noAccount || "Don't have an account?")
-                        : (translations[language]?.hasAccount || "Already have an account?")
-                      }
-                    </Text>
-                    <Button
-                      variant="link"
-                      color="blue.500"
-                      fontSize="sm"
-                      onClick={switchAuthMode}
-                      _hover={{ color: 'blue.600', textDecoration: 'underline' }}
-                      isDisabled={isLoading}
-                      fontWeight="medium"
-                    >
-                      {authMode === 'login' 
-                        ? (translations[language]?.signUpNow || "Sign up")
-                        : (translations[language]?.signInNow || "Sign in")
-                      }
-                    </Button>
-                  </HStack>
-                </VStack>
-              </Box>
-            </VStack>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
     </Box>
   );
 };

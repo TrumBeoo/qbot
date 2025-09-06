@@ -2,59 +2,55 @@
 import {
   Box,
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
-  Heading,
-  VStack,
-  HStack,
-  Text,
-  Icon,
-  useColorModeValue,
-  Badge,
-  Progress,
+  Typography,
+  Stack,
+  Chip,
+  LinearProgress,
   Divider,
-  Flex
-} from '@chakra-ui/react';
+  useTheme,
+  alpha
+} from '@mui/material';
 import { 
-  FiServer, 
-  FiDatabase, 
-  FiCpu, 
-  FiHardDrive,
-  FiWifi,
-  FiCheckCircle,
-  FiAlertTriangle
-} from 'react-icons/fi';
+  Dns as ServerIcon,
+  Storage as DatabaseIcon,
+  Memory as CpuIcon,
+  Computer as HardDriveIcon,
+  Wifi as WifiIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon
+} from '@mui/icons-material';
 
 const SystemStatus = ({ chatbotStats }) => {
-  const cardBg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const theme = useTheme();
 
   const systemMetrics = [
     {
       label: 'API Server',
       status: 'online',
-      icon: FiServer,
+      icon: ServerIcon,
       value: '99.9%',
       description: 'Uptime'
     },
     {
       label: 'Database',
       status: 'online',
-      icon: FiDatabase,
+      icon: DatabaseIcon,
       value: '< 50ms',
       description: 'Response time'
     },
     {
       label: 'Vector Store',
       status: 'online',
-      icon: FiCpu,
+      icon: CpuIcon,
       value: chatbotStats?.rag_system?.document_count || 0,
       description: 'Documents indexed'
     },
     {
       label: 'Storage',
       status: 'warning',
-      icon: FiHardDrive,
+      icon: HardDriveIcon,
       value: '78%',
       description: 'Used'
     }
@@ -62,90 +58,128 @@ const SystemStatus = ({ chatbotStats }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'online': return 'green';
-      case 'warning': return 'yellow';
-      case 'offline': return 'red';
-      default: return 'gray';
+      case 'online': return theme.palette.success.main;
+      case 'warning': return theme.palette.warning.main;
+      case 'offline': return theme.palette.error.main;
+      default: return theme.palette.grey[500];
     }
   };
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'online': return FiCheckCircle;
-      case 'warning': return FiAlertTriangle;
-      case 'offline': return FiAlertTriangle;
-      default: return FiServer;
+      case 'online': return CheckCircleIcon;
+      case 'warning': return WarningIcon;
+      case 'offline': return WarningIcon;
+      default: return ServerIcon;
+    }
+  };
+
+  const getChipColor = (status) => {
+    switch (status) {
+      case 'online': return 'success';
+      case 'warning': return 'warning';
+      case 'offline': return 'error';
+      default: return 'default';
     }
   };
 
   return (
-    <Card bg={cardBg} border="1px" borderColor={borderColor}>
-      <CardHeader>
-        <HStack>
-          <Icon as={FiWifi} color="green.500" />
-          <Heading size="md">Trạng thái hệ thống</Heading>
-          <Badge colorScheme="green" variant="subtle">
-            Hoạt động tốt
-          </Badge>
-        </HStack>
-      </CardHeader>
-      <CardBody>
-        <VStack align="stretch" spacing="4">
-          {systemMetrics.map((metric, index) => (
-            <Box key={index}>
-              <Flex justify="space-between" align="center" mb="2">
-                <HStack>
-                  <Icon as={metric.icon} color="gray.500" boxSize="4" />
-                  <Text fontSize="sm" fontWeight="medium">
-                    {metric.label}
-                  </Text>
-                </HStack>
-                <HStack>
-                  <Text fontSize="sm" fontWeight="bold">
-                    {metric.value}
-                  </Text>
-                  <Icon 
-                    as={getStatusIcon(metric.status)} 
-                    color={`${getStatusColor(metric.status)}.500`}
-                    boxSize="4"
+    <Card elevation={1} sx={{ height: '100%' }}>
+      <CardHeader
+        title={
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WifiIcon sx={{ color: theme.palette.success.main }} />
+            <Typography variant="h6" component="div">
+              Trạng thái hệ thống
+            </Typography>
+            <Chip 
+              label="Hoạt động tốt" 
+              color="success" 
+              size="small"
+              variant="outlined"
+            />
+          </Box>
+        }
+        sx={{ pb: 1 }}
+      />
+      <CardContent>
+        <Stack spacing={3}>
+          {systemMetrics.map((metric, index) => {
+            const StatusIcon = getStatusIcon(metric.status);
+            const MetricIcon = metric.icon;
+            
+            return (
+              <Box key={index}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <MetricIcon sx={{ color: theme.palette.text.secondary, fontSize: 18 }} />
+                    <Typography variant="body2" fontWeight="medium">
+                      {metric.label}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body2" fontWeight="bold">
+                      {metric.value}
+                    </Typography>
+                    <StatusIcon 
+                      sx={{ 
+                        color: getStatusColor(metric.status),
+                        fontSize: 18
+                      }}
+                    />
+                  </Box>
+                </Box>
+                
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                  {metric.description}
+                </Typography>
+                
+                {metric.status === 'warning' && metric.label === 'Storage' && (
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={78} 
+                    sx={{
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: alpha(theme.palette.warning.main, 0.1),
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: theme.palette.warning.main,
+                        borderRadius: 3
+                      }
+                    }}
                   />
-                </HStack>
-              </Flex>
-              <Text fontSize="xs" color="gray.500" mb="2">
-                {metric.description}
-              </Text>
-              {metric.status === 'warning' && metric.label === 'Storage' && (
-                <Progress value={78} colorScheme="yellow" size="sm" borderRadius="full" />
-              )}
-              {index < systemMetrics.length - 1 && <Divider mt="3" />}
-            </Box>
-          ))}
-        </VStack>
+                )}
+                
+                {index < systemMetrics.length - 1 && <Divider sx={{ mt: 2 }} />}
+              </Box>
+            );
+          })}
+        </Stack>
         
-        <Divider my="4" />
+        <Divider sx={{ my: 3 }} />
         
         <Box>
-          <Text fontSize="sm" fontWeight="medium" mb="2">
+          <Typography variant="body2" fontWeight="medium" gutterBottom>
             Thông tin phiên bản
-          </Text>
-          <VStack align="stretch" spacing="1">
-            <Flex justify="space-between">
-              <Text fontSize="xs" color="gray.500">Dashboard</Text>
-              <Text fontSize="xs" fontWeight="medium">v2.1.0</Text>
-            </Flex>
-            <Flex justify="space-between">
-              <Text fontSize="xs" color="gray.500">API Backend</Text>
-              <Text fontSize="xs" fontWeight="medium">v1.5.2</Text>
-            </Flex>
-            <Flex justify="space-between">
-              <Text fontSize="xs" color="gray.500">Last Update</Text>
-              <Text fontSize="xs" fontWeight="medium">
+          </Typography>
+          <Stack spacing={0.5}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography variant="caption" color="text.secondary">Dashboard</Typography>
+              <Typography variant="caption" fontWeight="medium">v2.1.0</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography variant="caption" color="text.secondary">API Backend</Typography>
+              <Typography variant="caption" fontWeight="medium">v1.5.2</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Typography variant="caption" color="text.secondary">Last Update</Typography>
+              <Typography variant="caption" fontWeight="medium">
                 {new Date().toLocaleDateString('vi-VN')}
-              </Text>
-            </Flex>
-          </VStack>
+              </Typography>
+            </Box>
+          </Stack>
         </Box>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 };
