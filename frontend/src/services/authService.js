@@ -211,6 +211,12 @@ class AuthService {
       return data.user;
     } catch (error) {
       console.error('Token verification error:', error);
+      
+      // Check if it's a network error
+      if (error.name === 'TypeError' || error.message.includes('fetch')) {
+        throw new Error('Network error - unable to verify token');
+      }
+      
       throw new Error(error.message || 'Token verification failed');
     }
   }

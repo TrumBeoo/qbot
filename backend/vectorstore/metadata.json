@@ -1,5 +1,5 @@
 {
-  "last_build_time": 1757176475.90699,
+  "last_build_time": 1757178094.622882,
   "document_count": 19,
   "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
   "chunk_size": 1000,

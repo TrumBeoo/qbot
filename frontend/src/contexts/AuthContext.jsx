@@ -12,7 +12,11 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    // Try to get user from localStorage on initial load
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
 
@@ -25,10 +29,43 @@ export const AuthProvider = ({ children }) => {
           const userData = await authService.verifyToken(savedToken);
           setUser(userData);
           setToken(savedToken);
+          // Save user data to localStorage for offline access
+          localStorage.setItem('user', JSON.stringify(userData));
         } catch (error) {
           console.error('Token verification failed:', error);
-          localStorage.removeItem('token');
-          setToken(null);
+          
+          // Only remove token if it's actually invalid (not network error)
+          if (error.message && (
+            error.message.includes('Token has expired') ||
+            error.message.includes('Token is invalid') ||
+            (error.message.includes('Token verification failed') && !error.message.includes('Network error'))
+          )) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setToken(null);
+            setUser(null);
+          } else {
+            // For network errors, keep the token and user data
+            console.warn('Network error during token verification, keeping existing session');
+            setToken(savedToken);
+            // Keep existing user data from localStorage if available
+            const savedUser = localStorage.getItem('user');
+            if (savedUser && !user) {
+              setUser(JSON.parse(savedUser));
+            }
+            
+            // Retry token verification after 5 seconds
+            setTimeout(async () => {
+              try {
+                const userData = await authService.verifyToken(savedToken);
+                setUser(userData);
+                localStorage.setItem('user', JSON.stringify(userData));
+                console.log('Token verification retry successful');
+              } catch (retryError) {
+                console.warn('Token verification retry failed:', retryError);
+              }
+            }, 5000);
+          }
         }
       }
       setLoading(false);
@@ -43,6 +80,7 @@ export const AuthProvider = ({ children }) => {
       setUser(response.user);
       setToken(response.token);
       localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       return { success: true, user: response.user };
     } catch (error) {
       console.error('Login failed:', error);
@@ -59,6 +97,7 @@ export const AuthProvider = ({ children }) => {
       setUser(response.user);
       setToken(response.token);
       localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       return { success: true, user: response.user };
     } catch (error) {
       console.error('Registration failed:', error);
@@ -83,6 +122,7 @@ export const AuthProvider = ({ children }) => {
       setUser(response.user);
       setToken(response.token);
       localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
       return { success: true, user: response.user };
     } catch (error) {
       console.error(`${provider} login failed:`, error);
@@ -97,6 +137,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     // Clear any other user-related data from localStorage
     localStorage.removeItem('currentConversationId');
   };
@@ -105,6 +146,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authService.updateProfile(profileData, token);
       setUser(response.user);
+      localStorage.setItem('user', JSON.stringify(response.user));
       return { success: true, user: response.user };
     } catch (error) {
       console.error('Profile update failed:', error);

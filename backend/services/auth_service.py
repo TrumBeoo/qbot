@@ -7,7 +7,7 @@ import os
 
 class AuthService:
     JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key-change-this')
-    JWT_EXPIRATION_HOURS = 24
+    JWT_EXPIRATION_HOURS = 24 * 7  # 7 days instead of 1 day
     
     @classmethod
     def generate_jwt_token(cls, user_id):
