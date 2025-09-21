@@ -36,3 +36,55 @@
     transform: rotate(360deg);
   }
 }
+
+/* Image gallery styles */
+.message-images {
+  display: grid;
+  gap: 8px;
+  max-width: 400px;
+  margin-top: 12px;
+}
+
+.message-images.single {
+  grid-template-columns: 1fr;
+}
+
+.message-images.double {
+  grid-template-columns: 1fr 1fr;
+}
+
+.message-images.triple {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.message-images.quad {
+  grid-template-columns: 1fr 1fr;
+}
+
+.message-image {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.message-image:hover {
+  opacity: 0.8;
+  transform: scale(1.02);
+}
+
+@media (max-width: 768px) {
+  .message-images {
+    max-width: 100%;
+  }
+  
+  .message-images.triple {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .message-image {
+    height: 100px;
+  }
+}

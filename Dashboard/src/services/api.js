@@ -43,6 +43,11 @@ export const authAPI = {
 };
 
 // Chatbot management API
+// Dashboard API for real analytics data
+export const dashboardAPI = {
+  getRealAnalyticsData: () => api.get('/dashboard/real-analytics'),
+};
+
 export const chatbotAPI = {
   // Get chatbot statistics
   getStats: () => api.get('/dashboard/chatbot-stats'),
@@ -84,4 +89,5 @@ export const servicesAPI = {
   deleteService: (id) => api.delete(`/services/${id}`),
 };
 
+export { api };
 export default api;

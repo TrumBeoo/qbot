@@ -76,14 +76,14 @@ const ConversationItem = ({
               onChange={(e) => setEditTitle(e.target.value)}
               onBlur={() => {
                 if (editTitle.trim() && editTitle !== conversation.title) {
-                  onRename(conversation._id, editTitle.trim());
+                  onRename(conversation.id, editTitle.trim());
                 }
                 setIsEditing(false);
               }}
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
                   if (editTitle.trim() && editTitle !== conversation.title) {
-                    onRename(conversation._id, editTitle.trim());
+                    onRename(conversation.id, editTitle.trim());
                   }
                   setIsEditing(false);
                 }
@@ -105,7 +105,7 @@ const ConversationItem = ({
             </Text>
           )}
           <Text fontSize="xs" color="gray.500">
-            {formatDate(conversation.updated_at)}
+            {formatDate(conversation.updated_at || conversation.created_at)}
           </Text>
           {conversation.message_count > 0 && (
             <Text fontSize="xs" color="gray.400">
@@ -139,7 +139,7 @@ const ConversationItem = ({
               color="red.500"
               onClick={(e) => {
                 e.stopPropagation();
-                onDelete(conversation._id);
+                onDelete(conversation.id);
                 onClose();
               }}
             >
@@ -174,9 +174,9 @@ const ConversationList = ({
     <VStack spacing={0} align="stretch">
       {conversations.map((conversation) => (
         <ConversationItem
-          key={conversation._id}
+          key={conversation.id}
           conversation={conversation}
-          isActive={currentConversation?._id === conversation._id}
+          isActive={currentConversation?.id === conversation.id}
           onSelect={onSelectConversation}
           onDelete={onDeleteConversation}
           onRename={onRenameConversation}

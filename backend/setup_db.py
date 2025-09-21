@@ -4,7 +4,7 @@ Database setup script for Chatbot Application
 Creates necessary indexes and collections for optimal performance
 """
 
-from db import mongo_db, users_collection, chat_collection
+from MongoDB.db import mongo_db, users_collection
 from datetime import datetime
 
 def create_indexes():
@@ -20,12 +20,8 @@ def create_indexes():
         users_collection.create_index('is_active')
         print("✓ Users collection indexes created")
         
-        # Chat collection indexes
-        chat_collection.create_index([('user_id', 1), ('updated_at', -1)])
-        chat_collection.create_index([('user_id', 1), ('created_at', -1)])
-        chat_collection.create_index([('user_id', 1), ('title', 'text')])
-        chat_collection.create_index([('user_id', 1), ('messages.text', 'text')])
-        print("✓ Chat collection indexes created")
+        # Chat collection moved to MySQL - no longer needed
+        print("✓ Chat collection moved to MySQL")
         
     except Exception as e:
         print(f"Error creating indexes: {e}")
@@ -44,11 +40,8 @@ def create_collections():
         else:
             print("✓ Users collection already exists")
             
-        if 'chat_history' not in existing_collections:
-            mongo_db.create_collection('chat_history')
-            print("✓ Chat history collection created")
-        else:
-            print("✓ Chat history collection already exists")
+        # Chat history moved to MySQL - no longer needed in MongoDB
+        print("✓ Chat history moved to MySQL")
             
     except Exception as e:
         print(f"Error creating collections: {e}")
@@ -64,10 +57,9 @@ def test_connection():
         
         # Test collections access
         users_count = users_collection.count_documents({})
-        chat_count = chat_collection.count_documents({})
         
         print(f"✓ Users collection: {users_count} documents")
-        print(f"✓ Chat history collection: {chat_count} documents")
+        print("✓ Chat history moved to MySQL")
         
         return True
         

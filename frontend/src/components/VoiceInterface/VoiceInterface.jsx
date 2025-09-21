@@ -39,6 +39,7 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
 
   const getStatusText = () => {
     const lang = responseLanguage || detectedLanguage;
+    if (isInitializing && isPlaying) return lang === 'en' ? 'Playing welcome message...' : 'Đang phát lời chào...';
     if (isInitializing) return lang === 'en' ? 'Initializing voice...' : 'Đang khởi tạo giọng nói...';
     if (isPlaying) return lang === 'en' ? 'Playing response...' : 'Đang phát phản hồi...';
     if (isProcessing) return lang === 'en' ? 'Processing your request...' : 'Đang xử lý yêu cầu...';
@@ -251,15 +252,62 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
       setSessionActive(true);
       setIsProcessing(false);
       setIsPlaying(false);
-      setDetectedLanguage('vi');
-      setResponseLanguage('vi');
-      shouldContinueListeningRef.current = true;
+      setDetectedLanguage(language || 'vi');
+      setResponseLanguage(language || 'vi');
+      shouldContinueListeningRef.current = false; // Don't listen during welcome
       
-      // Start listening immediately after a short delay
-      setTimeout(() => {
-        startListening();
-        setIsInitializing(false);
-      }, 500);
+      // Play welcome message first
+      try {
+        const welcomeResult = await voiceApi.voiceWelcome(language || 'vi');
+        
+        if (welcomeResult.success && welcomeResult.audioBase64) {
+          setIsPlaying(true);
+          const audio = voiceApi.createAudioElement(welcomeResult.audioBase64);
+          
+          if (audio) {
+            audioPlayerRef.current = audio;
+            
+            const onWelcomeEnd = () => {
+              setIsPlaying(false);
+              audioPlayerRef.current = null;
+              shouldContinueListeningRef.current = true;
+              
+              // Start listening after welcome message
+              setTimeout(() => {
+                startListening();
+                setIsInitializing(false);
+              }, 500);
+            };
+
+            audio.onended = onWelcomeEnd;
+            audio.onerror = onWelcomeEnd;
+            
+            await audio.play();
+          } else {
+            // No audio, proceed directly
+            shouldContinueListeningRef.current = true;
+            setTimeout(() => {
+              startListening();
+              setIsInitializing(false);
+            }, 500);
+          }
+        } else {
+          // Welcome failed, proceed without it
+          shouldContinueListeningRef.current = true;
+          setTimeout(() => {
+            startListening();
+            setIsInitializing(false);
+          }, 500);
+        }
+      } catch (welcomeError) {
+        console.warn('Welcome message failed:', welcomeError);
+        // Proceed without welcome
+        shouldContinueListeningRef.current = true;
+        setTimeout(() => {
+          startListening();
+          setIsInitializing(false);
+        }, 500);
+      }
       
     } catch (error) {
       setIsInitializing(false);
@@ -270,7 +318,7 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
         duration: 5000
       });
     }
-  }, [initMic, initRecognition, startListening, toast]);
+  }, [initMic, initRecognition, startListening, language, toast]);
 
   const endSession = useCallback(() => {
     console.log('Ending session');
@@ -327,7 +375,7 @@ const VoiceInterface = ({ isOpen, onClose, onVoiceResult, language = 'vi', curre
     setIsProcessing(true);
 
     try {
-      const result = await voiceApi.voiceChat(finalText, null, currentConversation?._id);
+      const result = await voiceApi.voiceChat(finalText, null, currentConversation?.id);
       
       if (!result.success) {
         throw new Error(result.error || 'Voice processing failed');

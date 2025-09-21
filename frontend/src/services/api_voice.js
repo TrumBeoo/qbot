@@ -187,6 +187,42 @@ class VoiceApiService {
    }
  }
 
+ async voiceWelcome(language = 'vi') {
+   try {
+     const response = await fetch(`${this.baseURL}/voice-welcome`, {
+       method: 'POST',
+       headers: this._getHeaders(false),
+       body: JSON.stringify({ language }),
+       signal: AbortSignal.timeout(10000)
+     });
+
+     if (!response.ok) {
+       const errorData = await response.json().catch(() => ({}));
+       throw new Error(errorData.message || `Request failed with status ${response.status}`);
+     }
+
+     const data = await response.json();
+     
+     if (data.status !== 'success') {
+       throw new Error(data.message || 'Voice welcome failed');
+     }
+
+     return {
+       success: true,
+       response: data.response,
+       language: data.language,
+       audioBase64: data.audio
+     };
+
+   } catch (error) {
+     console.error('Voice welcome error:', error);
+     return {
+       success: false,
+       error: error.message || 'Failed to get welcome message'
+     };
+   }
+ }
+
  // Utility method to test language detection
  testLanguageDetection(text) {
    return this._detectLanguageHint(text);

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api/chat';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 class ChatHistoryService {
   // Get authorization headers
@@ -11,9 +11,9 @@ class ChatHistoryService {
   }
 
   // Get all conversations for the current user
-  async getConversations() {
+  async getConversations(limit = 50, skip = 0) {
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat/conversations?limit=${limit}&skip=${skip}`, {
         method: 'GET',
         headers: this.getAuthHeaders()
       });
@@ -21,12 +21,12 @@ class ChatHistoryService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to get conversations');
+        throw new Error(data.message || 'Failed to get conversations');
       }
 
       return {
         success: true,
-        conversations: data.conversations
+        conversations: data.data || []
       };
     } catch (error) {
       console.error('Get conversations error:', error);
@@ -37,7 +37,7 @@ class ChatHistoryService {
   // Create a new conversation
   async createConversation(title = 'New Conversation') {
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat/conversations`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify({ title })
@@ -46,13 +46,13 @@ class ChatHistoryService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create conversation');
+        throw new Error(data.message || 'Failed to create conversation');
       }
 
       return {
         success: true,
-        conversation: data.conversation,
-        conversationId: data.conversation_id,
+        conversation: data.data,
+        conversationId: data.data?.id,
         message: data.message
       };
     } catch (error) {
@@ -64,7 +64,7 @@ class ChatHistoryService {
   // Get a specific conversation with all messages
   async getConversation(conversationId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${conversationId}`, {
         method: 'GET',
         headers: this.getAuthHeaders()
       });
@@ -72,12 +72,12 @@ class ChatHistoryService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to get conversation');
+        throw new Error(data.message || 'Failed to get conversation');
       }
 
       return {
         success: true,
-        conversation: data.conversation
+        conversation: data.data
       };
     } catch (error) {
       console.error('Get conversation error:', error);
@@ -88,7 +88,7 @@ class ChatHistoryService {
   // Add a message to a conversation
   async addMessage(conversationId, userMessage, botResponse = '', language = 'vi') {
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify({
@@ -101,12 +101,12 @@ class ChatHistoryService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to add message');
+        throw new Error(data.message || 'Failed to add message');
       }
 
       return {
         success: true,
-        messages: data.messages,
+        messages: data.data,
         message: data.message
       };
     } catch (error) {
@@ -115,19 +115,19 @@ class ChatHistoryService {
     }
   }
 
-  // Update conversation (e.g., change title)
-  async updateConversation(conversationId, updateData) {
+  // Update conversation title
+  async updateConversation(conversationId, updates) {
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${conversationId}`, {
         method: 'PUT',
         headers: this.getAuthHeaders(),
-        body: JSON.stringify(updateData)
+        body: JSON.stringify(updates)
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update conversation');
+        throw new Error(data.message || 'Failed to update conversation');
       }
 
       return {
@@ -143,7 +143,7 @@ class ChatHistoryService {
   // Delete a conversation
   async deleteConversation(conversationId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${conversationId}`, {
         method: 'DELETE',
         headers: this.getAuthHeaders()
       });
@@ -151,7 +151,7 @@ class ChatHistoryService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete conversation');
+        throw new Error(data.message || 'Failed to delete conversation');
       }
 
       return {
@@ -164,10 +164,10 @@ class ChatHistoryService {
     }
   }
 
-  // Delete a specific message from a conversation
+  // Delete a specific message
   async deleteMessage(conversationId, messageId) {
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages/${messageId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat/conversations/${conversationId}/messages/${messageId}`, {
         method: 'DELETE',
         headers: this.getAuthHeaders()
       });
@@ -175,7 +175,7 @@ class ChatHistoryService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete message');
+        throw new Error(data.message || 'Failed to delete message');
       }
 
       return {
@@ -189,9 +189,9 @@ class ChatHistoryService {
   }
 
   // Search conversations and messages
-  async searchConversations(query) {
+  async searchConversations(query, limit = 20) {
     try {
-      const response = await fetch(`${API_BASE_URL}/search?q=${encodeURIComponent(query)}`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat/search?q=${encodeURIComponent(query)}&limit=${limit}`, {
         method: 'GET',
         headers: this.getAuthHeaders()
       });
@@ -199,24 +199,24 @@ class ChatHistoryService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Search failed');
+        throw new Error(data.message || 'Failed to search conversations');
       }
 
       return {
         success: true,
-        results: data.results,
+        results: data.data,
         query: data.query
       };
     } catch (error) {
-      console.error('Search error:', error);
-      throw new Error(error.message || 'Search failed');
+      console.error('Search conversations error:', error);
+      throw new Error(error.message || 'Failed to search conversations');
     }
   }
 
   // Export all conversations
   async exportConversations() {
     try {
-      const response = await fetch(`${API_BASE_URL}/export`, {
+      const response = await fetch(`${API_BASE_URL}/api/chat/export`, {
         method: 'GET',
         headers: this.getAuthHeaders()
       });
@@ -224,16 +224,94 @@ class ChatHistoryService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Export failed');
+        throw new Error(data.message || 'Failed to export conversations');
       }
 
       return {
         success: true,
-        data: data
+        data: data.data
       };
     } catch (error) {
-      console.error('Export error:', error);
-      throw new Error(error.message || 'Export failed');
+      console.error('Export conversations error:', error);
+      throw new Error(error.message || 'Failed to export conversations');
+    }
+  }
+
+  // Get conversation statistics
+  async getConversationStats() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat/stats`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to get conversation stats');
+      }
+
+      return {
+        success: true,
+        stats: data.data
+      };
+    } catch (error) {
+      console.error('Get conversation stats error:', error);
+      throw new Error(error.message || 'Failed to get conversation stats');
+    }
+  }
+
+  // Legacy support - Save chat history
+  async saveChatHistory(userMessage, botResponse, language = 'vi', conversationId = null) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat/history`, {
+        method: 'POST',
+        headers: this.getAuthHeaders(),
+        body: JSON.stringify({
+          user_message: userMessage,
+          bot_response: botResponse,
+          language,
+          conversation_id: conversationId
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to save chat history');
+      }
+
+      return {
+        success: true,
+        data: data.data
+      };
+    } catch (error) {
+      console.error('Save chat history error:', error);
+      throw new Error(error.message || 'Failed to save chat history');
+    }
+  }
+
+  // Legacy support - Get chat history
+  async getChatHistory(limit = 50, skip = 0) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat/history?limit=${limit}&skip=${skip}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders()
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to get chat history');
+      }
+
+      return {
+        success: true,
+        history: data.data
+      };
+    } catch (error) {
+      console.error('Get chat history error:', error);
+      throw new Error(error.message || 'Failed to get chat history');
     }
   }
 
@@ -247,54 +325,17 @@ class ChatHistoryService {
     return title.substring(0, maxLength - 3) + '...';
   }
 
-  // Helper method to format conversation for display
-  formatConversationForDisplay(conversation) {
-    return {
-      id: conversation._id,
-      title: conversation.title,
-      messageCount: conversation.message_count || conversation.messages?.length || 0,
-      lastMessage: conversation.messages?.length > 0 
-        ? conversation.messages[conversation.messages.length - 1]
-        : null,
-      createdAt: new Date(conversation.created_at),
-      updatedAt: new Date(conversation.updated_at)
-    };
-  }
-
-  // Helper method to format message for display
-  formatMessageForDisplay(message) {
-    return {
-      id: message._id,
-      text: message.text,
-      sender: message.sender,
-      timestamp: new Date(message.timestamp),
-      language: message.language || 'vi',
-      isError: message.isError || false
-    };
-  }
-
-  // Get conversation statistics
-  async getConversationStats() {
-    try {
-      const response = await fetch(`${API_BASE_URL}/stats`, {
-        method: 'GET',
-        headers: this.getAuthHeaders()
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to get stats');
-      }
-
-      return {
-        success: true,
-        stats: data
-      };
-    } catch (error) {
-      console.error('Get stats error:', error);
-      throw new Error(error.message || 'Failed to get stats');
-    }
+  // Helper method to download exported data as JSON file
+  downloadExportedData(data, filename = 'chat_conversations_export.json') {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }
 

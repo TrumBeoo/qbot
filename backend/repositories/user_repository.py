@@ -1,6 +1,6 @@
 from bson import ObjectId
 from datetime import datetime
-from db import users_collection
+from MongoDB.db import users_collection
 from models.user import User
 
 class UserRepository:

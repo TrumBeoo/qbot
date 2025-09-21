@@ -78,8 +78,9 @@ const LoginPage = () => {
   return (
     <Box
       sx={{
+        background: "url('/images/bg.jpg') no-repeat center/cover",
         minHeight: '100vh',
-        background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
+        //background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
         display: 'flex',
         alignItems: 'center',
         py: 3
@@ -126,7 +127,7 @@ const LoginPage = () => {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              ServiceHub Admin
+              QBot Admin
             </Typography>
             
             <Typography variant="body1" color="text.secondary">
@@ -206,11 +207,17 @@ const LoginPage = () => {
                 variant="contained"
                 size="large"
                 disabled={loading}
-                startIcon={loading ? <CircularProgress size={20} /> : <LoginIcon />}
+                
+                
+                //startIcon={loading ? <CircularProgress size={20} /> : <LoginIcon />}
                 sx={{
-                  py: 1.5,
+                  py: 1,
                   borderRadius: 2,
-                  background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                  fontSize: '1.5rem',
+                  fontWeight: 'bold',
+                  //background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                  color:'blue.500',
+                  
                   boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.4)}`,
                   '&:hover': {
                     boxShadow: `0 6px 25px ${alpha(theme.palette.primary.main, 0.5)}`,
@@ -248,7 +255,7 @@ const LoginPage = () => {
               Chỉ dành cho quản trị viên được ủy quyền
             </Typography>
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-              Phiên bản: 2.1.0 | © 2024 ServiceHub
+              Phiên bản: 2.1.0 | © 2025 - ServiceHub
             </Typography>
           </Paper>
         </Paper>

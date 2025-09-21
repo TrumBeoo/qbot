@@ -1,7 +1,7 @@
 {
-  "last_build_time": 1757178094.622882,
+  "last_build_time": 1758423754.958006,
   "document_count": 19,
-  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "embedding_model": "sentence-transformers/distiluse-base-multilingual-cased-v1",
   "chunk_size": 1000,
   "chunk_overlap": 200
 }

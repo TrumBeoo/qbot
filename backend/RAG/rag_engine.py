@@ -5,7 +5,7 @@ from datetime import datetime
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.chains import RetrievalQA
+from langchain.chains import RetrievalQA, ConversationalRetrievalChain
 from langchain_groq import ChatGroq
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document                                                       
@@ -25,7 +25,7 @@ class RAGEngine:
     def __init__(self, 
                  data_dir: str = "data/", 
                  vectorstore_path: str = "vectorstore/index",
-                 embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+                 embedding_model: str = "sentence-transformers/distiluse-base-multilingual-cased-v1",
                  llm_model: str = "llama-3.3-70b-versatile",
                  chunk_size: int = 1000,
                  chunk_overlap: int = 200,
@@ -255,7 +255,7 @@ class RAGEngine:
             Móng Cái, Đông Triều, Quảng Yên, v.v.).
             
             Nếu câu hỏi không liên quan đến du lịch hoặc nằm ngoài tỉnh Quảng Ninh, hãy lịch sự 
-            từ chối và gợi ý người dùng hỏi về du lịch tại Quảng Ninh.
+            từ chối và gợi ý người dùng hỏi về du lịch tại Quảng Ninh, đặc biệt là không được tự ý bịa thông tin không chính xác, chỉ trả lời theo thông tin được cung cấp.
             
             Hãy trả lời một cách thân thiện, nhiệt tình và cung cấp thông tin hữu ích.
 
@@ -269,6 +269,7 @@ class RAGEngine:
             - Cung cấp thông tin chính xác và cụ thể
             - Nếu không có thông tin trong tài liệu, hãy thông báo rõ ràng
             - Đưa ra lời khuyên thực tế cho du khách
+            - Không tự ý bịa thông tin
 
             Câu trả lời:
             """
@@ -277,6 +278,64 @@ class RAGEngine:
             template=template,
             input_variables=["context", "question"]
         )
+    
+    def _get_friendly_error_message(self, language: str = 'vi') -> str:
+        """Get a friendly error message instead of technical error."""
+        if language == 'en':
+            return ("I apologize, but I'm experiencing some technical difficulties at the moment. "
+                   "Please try asking your question again in a few moments. "
+                   "If the problem persists, please contact our support team.")
+        else:
+            return ("Xin lỗi, hiện tại tôi đang gặp một số vấn đề kỹ thuật. "
+                   "Vui lòng thử hỏi lại câu hỏi sau vài phút. "
+                   "Nếu vấn đề vẫn tiếp tục, vui lòng liên hệ đội hỗ trợ của chúng tôi.")
+    
+    def _generate_fallback_response(self, query: str, language: str = 'vi') -> str:
+        """Generate a fallback response when no specific information is found."""
+        try:
+            # Use LLM to generate a helpful response even without specific data
+            llm = self._get_llm()
+            
+            if language == 'en':
+                fallback_prompt = f"""
+                You are QBot, a travel assistant for Quang Ninh Province, Vietnam.
+                A user asked: "{query}"
+                
+                Even though you don't have specific information about this topic in your database,
+                provide a helpful, general response about Quang Ninh tourism and suggest they:
+                1. Contact local tourism offices
+                2. Check official tourism websites
+                3. Ask for more specific information
+                
+                Keep the response friendly and encouraging. Answer in English.
+                """
+            else:
+                fallback_prompt = f"""
+                Bạn là QBot, trợ lý du lịch của tỉnh Quảng Ninh, Việt Nam.
+                Người dùng hỏi: "{query}"
+                
+                Mặc dù bạn không có thông tin cụ thể về chủ đề này trong cơ sở dữ liệu,
+                hãy đưa ra phản hồi hữu ích, tổng quát về du lịch Quảng Ninh và gợi ý họ:
+                1. Liên hệ văn phòng du lịch địa phương
+                2. Kiểm tra các trang web du lịch chính thức
+                3. Hỏi thông tin cụ thể hơn
+                
+                Giữ phản hồi thân thiện và khuyến khích. Trả lời bằng tiếng Việt.
+                """
+            
+            response = llm.invoke(fallback_prompt)
+            return response.content if hasattr(response, 'content') else str(response)
+            
+        except Exception as e:
+            logger.error(f"Error generating fallback response: {e}")
+            if language == 'en':
+                return ("I apologize, but I don't have specific information about that topic in my current database. "
+                       "For the most accurate and up-to-date information about Quang Ninh tourism, "
+                       "I recommend contacting local tourism offices or checking official tourism websites.")
+            else:
+                return ("Xin lỗi, tôi không có thông tin cụ thể về chủ đề đó trong cơ sở dữ liệu hiện tại. "
+                       "Để có thông tin chính xác và cập nhật nhất về du lịch Quảng Ninh, "
+                       "tôi khuyên bạn nên liên hệ với các văn phòng du lịch địa phương hoặc kiểm tra các trang web du lịch chính thức.")
     
     def _load_qa_chain(self, language: str = 'vi') -> RetrievalQA:
         """Load QA chain with caching and custom prompt for specific language."""
@@ -324,6 +383,12 @@ class RAGEngine:
             
             answer = result.get("result", "")
             
+            # Check if answer is empty or indicates no information found
+            if not answer or answer.strip() == "" or "không có thông tin" in answer.lower() or "no information" in answer.lower():
+                fallback_answer = self._generate_fallback_response(query, language)
+                if fallback_answer:
+                    answer = fallback_answer
+            
             if return_sources:
                 sources = []
                 for doc in result.get("source_documents", []):
@@ -342,8 +407,119 @@ class RAGEngine:
             
         except Exception as e:
             logger.error(f"Error processing question: {e}")
-            error_msg = f"Xin lỗi, đã xảy ra lỗi khi xử lý câu hỏi của bạn: {str(e)}" if language == 'vi' else f"Sorry, an error occurred while processing your question: {str(e)}"
-            return error_msg
+            # Return friendly error message instead of technical error
+            return self._get_friendly_error_message(language)
+    
+    def ask_question_with_memory(self, 
+                               query: str, 
+                               conversation_memory,
+                               language: str = 'vi', 
+                               return_sources: bool = False) -> str:
+        """
+        Ask a question with conversation memory context.
+        
+        Args:
+            query: User question
+            conversation_memory: LangChain memory instance
+            language: Language for response ('vi' or 'en')
+            return_sources: Whether to include source information
+            
+        Returns:
+            Answer string or dict with sources if return_sources=True
+        """
+        if not query.strip():
+            return "Vui lòng cung cấp câu hỏi hợp lệ." if language == 'vi' else "Please provide a valid question."
+        
+        try:
+            vectorstore = self._load_vectorstore()
+            retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+            
+            llm = self._get_llm()
+            
+            # Create conversational prompt template
+            if language == 'en':
+                template = """
+                You are QBot, a smart travel assistant for Quang Ninh Province, Vietnam.
+                Use the following context and conversation history to answer the question.
+                
+                Context from documents:
+                {context}
+                
+                Chat History:
+                {chat_history}
+                
+                Current Question: {question}
+                
+                Guidelines:
+                - Answer in English
+                - Focus on Quang Ninh Province tourism
+                - Use conversation history for context
+                - Be friendly and helpful
+                
+                Answer:
+                """
+            else:
+                template = """
+                Bạn là QBot, trợ lý du lịch thông minh của tỉnh Quảng Ninh, Việt Nam.
+                Sử dụng thông tin từ tài liệu và lịch sử cuộc trò chuyện để trả lời câu hỏi.
+                
+                Thông tin từ tài liệu:
+                {context}
+                
+                Lịch sử trò chuyện:
+                {chat_history}
+                
+                Câu hỏi hiện tại: {question}
+                
+                Hướng dẫn:
+                - Trả lời bằng tiếng Việt
+                - Tập trung vào du lịch tỉnh Quảng Ninh
+                - Sử dụng lịch sử trò chuyện để hiểu ngữ cảnh
+                - Thân thiện và hữu ích
+                
+                Câu trả lời:
+                """
+            
+            # Create conversational retrieval chain
+            qa_chain = ConversationalRetrievalChain.from_llm(
+                llm=llm,
+                retriever=retriever,
+                memory=conversation_memory,
+                return_source_documents=return_sources,
+                verbose=False
+            )
+            
+            # Get response
+            result = qa_chain({"question": query})
+            
+            answer = result.get("answer", "")
+            
+            # Check if answer is empty or indicates no information found
+            if not answer or answer.strip() == "" or "không có thông tin" in answer.lower() or "no information" in answer.lower():
+                fallback_answer = self._generate_fallback_response(query, language)
+                if fallback_answer:
+                    answer = fallback_answer
+            
+            if return_sources:
+                sources = []
+                for doc in result.get("source_documents", []):
+                    sources.append({
+                        "content": doc.page_content[:200] + "...",
+                        "source": doc.metadata.get("source_file", "Unknown"),
+                        "page": doc.metadata.get("page", "N/A")
+                    })
+                
+                return {
+                    "answer": answer,
+                    "sources": sources
+                }
+            
+            return answer
+            
+        except Exception as e:
+            logger.error(f"Error processing question with memory: {e}")
+            # Return friendly error message instead of technical error
+            return self._get_friendly_error_message(language)
     
     def get_stats(self) -> Dict[str, Any]:
         """Get statistics about the RAG system."""

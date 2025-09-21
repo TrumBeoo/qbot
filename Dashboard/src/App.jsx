@@ -1,5 +1,6 @@
 // src/App.jsx
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { ChakraProvider } from '@chakra-ui/react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/common/ProtectedRoute';
@@ -8,13 +9,13 @@ import Layout from './components/common/Layout';
 // Components
 import LoginPage from './components/auth/Login';
 import DashboardPage from './components/dashboard/Dashboard';
-// import AnalyticsPage from './components/analytics/Analytics';
+import AnalyticsPage from './components/analytics/AnalyticsWithCharts';
 import ProfilePage from './components/profile/Profile';
-// import ChatbotManagement from './components/chatbot/ChatbotManagement';
 import ServicesPage from './components/services/Services';
-// import AddService from './components/services/AddService';
-// import EditService from './components/services/EditService';
-// import DataManagement from './components/data/DataManagement';
+import AddService from './components/services/AddService';
+import EditService from './components/services/EditService';
+import DataFileManagement from './components/data/DataFileManagement';
+import ImageManagement from './components/images/ImageManagement';
 import PlaceholderPage from './components/common/PlaceholderPage';
 
 // MUI theme customization
@@ -86,11 +87,12 @@ const theme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AuthProvider>
-        <Router>
-          <Routes>
+    <ChakraProvider>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthProvider>
+          <Router>
+            <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             
@@ -122,7 +124,7 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <PlaceholderPage title="Analytics" description="Trang phân tích dữ liệu đang được phát triển." />
+                    <AnalyticsPage />
                   </Layout>
                 </ProtectedRoute>
               }
@@ -140,22 +142,22 @@ function App() {
             />
             
             <Route
-              path="/chatbot"
+              path="/data-files"
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <PlaceholderPage title="Chatbot Management" description="Trang quản lý chatbot đang được phát triển." />
+                    <DataFileManagement />
                   </Layout>
                 </ProtectedRoute>
               }
             />
             
             <Route
-              path="/data-management"
+              path="/images"
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <PlaceholderPage title="Data Management" description="Trang quản lý dữ liệu đang được phát triển." />
+                    <ImageManagement />
                   </Layout>
                 </ProtectedRoute>
               }
@@ -166,7 +168,7 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <PlaceholderPage title="Add Service" description="Trang thêm dịch vụ đang được phát triển." />
+                    <AddService />
                   </Layout>
                 </ProtectedRoute>
               }
@@ -177,7 +179,7 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <PlaceholderPage title="Edit Service" description="Trang chỉnh sửa dịch vụ đang được phát triển." />
+                    <EditService />
                   </Layout>
                 </ProtectedRoute>
               }
@@ -188,10 +190,11 @@ function App() {
             
             {/* 404 page - fallback to dashboard for now */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </Router>
-      </AuthProvider>
-    </ThemeProvider>
+            </Routes>
+          </Router>
+        </AuthProvider>
+      </ThemeProvider>
+    </ChakraProvider>
   );
 }
 

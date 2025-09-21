@@ -19,6 +19,10 @@ import ChatInput from './components/ChatInput/ChatInput';
 import Sidebar from './components/Sidebar/Sidebar';
 import VoiceInterface from './components/VoiceInterface/VoiceInterface';
 import TypingText from './components/Typing/TypingText';
+import MapView from './components/MapView/MapView';
+import AdvancedMapView from './components/MapView/AdvancedMapView';
+import ChatStats from './components/ChatStats/ChatStats';
+import SearchResults from './components/SearchResults/SearchResults';
 
 // Hooks and Constants
 import { translations, chatbotConfig } from './constants';
@@ -26,6 +30,7 @@ import { useTheme } from './contexts/ThemeContext';
 import { useAuth } from './contexts/AuthContext';
 import { apiService } from './services/api_chat';
 import { chatHistoryService } from './services/chatHistoryService';
+import { mapService } from './services/mapService';
 
 // Loading component
 const LoadingScreen = ({ message = "Loading..." }) => (
@@ -61,6 +66,10 @@ function App() {
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [currentConversation, setCurrentConversation] = useState(null);
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  const [isAdvancedMapOpen, setIsAdvancedMapOpen] = useState(false);
+  const [mapQuery, setMapQuery] = useState('');
+  const [userLocation, setUserLocation] = useState(null);
   
   // Refs
   const messagesEndRef = useRef(null);
@@ -123,7 +132,7 @@ function App() {
         // Load current conversation if exists
         const savedConvId = localStorage.getItem('currentConversationId');
         if (savedConvId) {
-          const conversation = response.conversations.find(c => c._id === savedConvId);
+          const conversation = response.conversations.find(c => c.id === savedConvId);
           if (conversation) {
             await selectConversation(savedConvId);
           }
@@ -145,7 +154,7 @@ function App() {
         setConversations(prev => [newConversation, ...prev]);
         setCurrentConversation(newConversation);
         setMessages([]);
-        localStorage.setItem('currentConversationId', newConversation._id);
+        localStorage.setItem('currentConversationId', newConversation.id);
         return newConversation;
       }
     } catch (error) {
@@ -160,15 +169,35 @@ function App() {
     if (!user || !conversationId) return;
     
     try {
+      console.log(`🔍 Loading conversation: ${conversationId}`);
       const response = await chatHistoryService.getConversation(conversationId);
+      
       if (response.success) {
         const conversation = response.conversation;
+        console.log(`📋 Conversation loaded:`, conversation);
+        console.log(`💬 Messages count: ${conversation.messages?.length || 0}`);
+        
         setCurrentConversation(conversation);
-        setMessages(conversation.messages || []);
+        
+        // Format messages for display
+        const formattedMessages = (conversation.messages || []).map(msg => ({
+          id: msg.id,
+          text: msg.content || msg.text,
+          sender: msg.sender,
+          timestamp: msg.timestamp || msg.created_at,
+          language: msg.language || 'vi',
+          images: Array.isArray(msg.images) ? msg.images : []
+        }));
+        
+        console.log(`✅ Setting ${formattedMessages.length} messages`);
+        setMessages(formattedMessages);
         localStorage.setItem('currentConversationId', conversationId);
+      } else {
+        console.error('❌ Failed to load conversation:', response.error);
+        showToast('Error', 'Failed to load conversation', 'error');
       }
     } catch (error) {
-      console.error('Error loading conversation:', error);
+      console.error('❌ Error loading conversation:', error);
       showToast('Error', 'Failed to load conversation', 'error');
     }
   }, [user, showToast]);
@@ -249,6 +278,49 @@ function App() {
 
     const trimmedMessage = messageText.trim();
     
+    // Check if message is map-related
+    const mapQuery = mapService.parseLocationQuery(trimmedMessage);
+    if (mapQuery) {
+      // Handle map-related queries
+      const mapResponse = mapService.generateMapResponse(mapQuery.type, mapQuery);
+      
+      // Create user message
+      const userMessage = {
+        id: `user-${Date.now()}`,
+        text: trimmedMessage,
+        sender: 'user',
+        timestamp: new Date().toISOString()
+      };
+
+      // Create bot response message
+      const botMessage = {
+        id: `bot-${Date.now()}`,
+        text: mapResponse,
+        sender: 'bot',
+        timestamp: new Date().toISOString()
+      };
+
+      // Add messages
+      setMessages(prev => [...prev, userMessage, botMessage]);
+      setInputText('');
+
+      // Open advanced map with appropriate query
+      let searchQuery = '';
+      if (mapQuery.type === 'findPlace') {
+        searchQuery = mapService.formatLocationQuery(mapQuery.query, mapQuery.location);
+      } else if (mapQuery.type === 'directions') {
+        searchQuery = `${mapQuery.origin} to ${mapQuery.destination}`;
+      } else if (mapQuery.type === 'nearbyPlaces') {
+        searchQuery = mapQuery.query;
+      } else {
+        searchQuery = mapService.extractLocationFromMessage(trimmedMessage);
+      }
+      
+      setMapQuery(searchQuery);
+      setIsAdvancedMapOpen(true);
+      return;
+    }
+    
     // Create user message
     const userMessage = {
       id: `user-${Date.now()}`,
@@ -263,46 +335,48 @@ function App() {
     setIsLoading(true);
 
     try {
-      // Call the backend API
-      const response = await apiService.sendMessage(trimmedMessage);
+      // Call the backend API with conversation_id if available
+      const response = await apiService.sendMessage(
+        trimmedMessage, 
+        language, 
+        currentConversation?.id
+      );
       
       if (response.success) {
+        console.log('📨 Bot message images:', response.images?.length || 0, response.images);
         const botMessage = {
           id: `bot-${Date.now()}`,
           text: response.message,
           sender: 'bot',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          images: Array.isArray(response.images) ? response.images : []
         };
+        console.log('💬 Final bot message with images:', botMessage.images?.length || 0, 'images');
 
         setMessages(prev => [...prev, botMessage]);
 
-        // Save to chat history if user is logged in
-        if (user) {
+        // Save to chat history if user is logged in and no conversation exists
+        // (If conversation exists, backend already saves automatically)
+        if (user && !currentConversation) {
           try {
-            let conversationId = currentConversation?._id;
-            
             // Create new conversation if none exists
-            if (!conversationId) {
-              const title = chatHistoryService.generateConversationTitle(trimmedMessage);
-              const newConv = await createNewConversation(title);
-              conversationId = newConv?._id;
-            }
+            const title = chatHistoryService.generateConversationTitle(trimmedMessage);
+            const newConv = await createNewConversation(title);
             
-            // Save messages to conversation
-            if (conversationId) {
-              await chatHistoryService.addMessage(
-                conversationId, 
-                trimmedMessage, 
-                response.message, 
-                language
-              );
-              
-              // Refresh conversations list
+            if (newConv) {
+              // Refresh conversations list to get updated data
               loadConversations();
             }
           } catch (historyError) {
-            console.error('Error saving to chat history:', historyError);
+            console.error('Error creating new conversation:', historyError);
             // Don't show error toast for history save failure
+          }
+        } else if (user && currentConversation) {
+          // Just refresh to get any updates from backend
+          try {
+            loadConversations();
+          } catch (error) {
+            console.error('Error refreshing conversations:', error);
           }
         }
       } else {
@@ -361,32 +435,116 @@ function App() {
    setIsVoiceOpen(false);
  }, []);
 
+ // Map handlers
+ const handleMapOpen = useCallback((query = '') => {
+   setMapQuery(query);
+   setIsMapOpen(true);
+ }, []);
+
+ const handleMapClose = useCallback(() => {
+   setIsMapOpen(false);
+   setMapQuery('');
+ }, []);
+
+ const handleAdvancedMapOpen = useCallback((query = '', location = null) => {
+   setMapQuery(query);
+   setUserLocation(location);
+   setIsAdvancedMapOpen(true);
+ }, []);
+
+ const handleAdvancedMapClose = useCallback(() => {
+   setIsAdvancedMapOpen(false);
+   setMapQuery('');
+   setUserLocation(null);
+ }, []);
+
+ const handleMapClick = useCallback(() => {
+   const query = 'Các địa điểm du lịch nổi tiếng Việt Nam';
+   setInputText(query);
+   handleSend(query);
+ }, [handleSend]);
+
+ const handleRouteClick = useCallback(() => {
+   const query = 'Chỉ đường từ Hà Nội đến Hạ Long';
+   setInputText(query);
+   handleSend(query);
+ }, [handleSend]);
+
+ const handleLocationClick = useCallback(() => {
+   const query = 'Tìm các địa điểm du lịch gần đây';
+   setInputText(query);
+   handleSend(query);
+ }, [handleSend]);
+
+ const handleDirectionClick = useCallback(() => {
+   const query = 'Hướng dẫn đi từ Hà Nội đến Sapa';
+   setInputText(query);
+   handleSend(query);
+ }, [handleSend]);
+
+ const handleAdvancedMapClick = useCallback(() => {
+   handleAdvancedMapOpen('Khám phá địa điểm du lịch Việt Nam');
+ }, [handleAdvancedMapOpen]);
+
  const handleVoiceResult = useCallback((userText, botText) => {
    const u = (userText || '').trim();
+   const bot = (botText || '').trim();
+   
    if (!u) return;
    
+   // Create user message
    const userMessage = {
      id: `user-${Date.now()}`,
      text: u,
      sender: 'user',
      timestamp: new Date().toISOString()
    };
-   setMessages(prev => [...prev, userMessage]);
-   setInputText('');
-
-   const bot = (botText || '').trim();
-   if (bot) {
-     const botMessage = {
-       id: `bot-${Date.now()}`,
-       text: bot,
-       sender: 'bot',
-       timestamp: new Date().toISOString()
-     };
-     setMessages(prev => [...prev, botMessage]);
+   
+   // Create bot message if we have a response
+   const botMessage = bot ? {
+     id: `bot-${Date.now()}`,
+     text: bot,
+     sender: 'bot',
+     timestamp: new Date().toISOString()
+   } : null;
+   
+   // Add messages to chat
+   if (botMessage) {
+     setMessages(prev => [...prev, userMessage, botMessage]);
    } else {
-     handleSend(u);
+     setMessages(prev => [...prev, userMessage]);
    }
- }, [handleSend]);
+   
+   setInputText('');
+   
+   // Save to chat history if user is logged in and we have both messages
+   // Note: Voice chat with authentication should already save to backend automatically
+   if (user && botMessage && !currentConversation) {
+     (async () => {
+       try {
+         // Create new conversation if none exists
+         const title = chatHistoryService.generateConversationTitle(u);
+         const newConv = await createNewConversation(title);
+         
+         if (newConv) {
+           // Refresh conversations list
+           loadConversations();
+         }
+       } catch (historyError) {
+         console.error('Error creating conversation for voice chat:', historyError);
+       }
+    })();
+   } else if (user && currentConversation) {
+     // Just refresh to get any updates from backend
+     (async () => {
+       try {
+          loadConversations();
+       } catch (error) {
+         console.error('Error refreshing conversations after voice chat:', error);
+       }
+     })();
+   }
+ }, [user, currentConversation, createNewConversation, loadConversations, language]);
 
  // Conversation management
  const handleNewConversation = useCallback(async () => {
@@ -401,9 +559,9 @@ function App() {
    
    try {
      await chatHistoryService.deleteConversation(conversationId);
-     setConversations(prev => prev.filter(c => c._id !== conversationId));
+     setConversations(prev => prev.filter(c => c.id !== conversationId));
      
-     if (currentConversation?._id === conversationId) {
+     if (currentConversation?.id === conversationId) {
        setCurrentConversation(null);
        setMessages([]);
        localStorage.removeItem('currentConversationId');
@@ -422,10 +580,10 @@ function App() {
    try {
      await chatHistoryService.updateConversation(conversationId, { title: newTitle.trim() });
      setConversations(prev => 
-       prev.map(c => c._id === conversationId ? { ...c, title: newTitle.trim() } : c)
+       prev.map(c => c.id === conversationId ? { ...c, title: newTitle.trim() } : c)
      );
      
-     if (currentConversation?._id === conversationId) {
+     if (currentConversation?.id === conversationId) {
        setCurrentConversation(prev => ({ ...prev, title: newTitle.trim() }));
      }
      
@@ -474,6 +632,10 @@ function App() {
        language={language}
        onLogout={handleLogout}
        onProfile={() => console.log('Profile clicked')}
+       onLogin={handleLogin}
+       onRegister={handleRegister}
+       onSocialLogin={handleSocialLogin}
+       onLanguageChange={handleLanguageChange}
      />
 
      {/* Main Chat Area */}
@@ -483,9 +645,6 @@ function App() {
          onLanguageChange={handleLanguageChange}
          onToggleSidebar={toggleSidebar}
          user={user}
-         onLogin={handleLogin}
-         onRegister={handleRegister}
-         onSocialLogin={handleSocialLogin}
          currentConversation={currentConversation}
          config={chatbotConfig}
        />
@@ -510,10 +669,11 @@ function App() {
                language={language}
                config={chatbotConfig}
                onVoiceClick={handleVoiceClick}
-               onMapClick={() => setInputText('Tôi muốn xem bản đồ các địa điểm du lịch ở Quảng Ninh')}
-               onRouteClick={() => setInputText('Tôi muốn tìm đường từ ')}
-               onLocationClick={() => setInputText('Các địa điểm du lịch gần đây là gì?')}
-               onDirectionClick={() => setInputText('Hướng dẫn đi từ Hà Nội đến Quảng Ninh')}
+               onMapClick={handleMapClick}
+               onAdvancedMapClick={handleAdvancedMapClick}
+               onRouteClick={handleRouteClick}
+               onLocationClick={handleLocationClick}
+               onDirectionClick={handleDirectionClick}
              />
            </Box>
          </Box>
@@ -526,6 +686,22 @@ function App() {
        onClose={handleVoiceClose}
        onVoiceResult={handleVoiceResult}
        language={language}
+       currentConversation={currentConversation}
+     />
+
+     {/* Map View Modal */}
+     <MapView
+       isOpen={isMapOpen}
+       onClose={handleMapClose}
+       initialQuery={mapQuery}
+     />
+
+     {/* Advanced Map View Modal */}
+     <AdvancedMapView
+       isOpen={isAdvancedMapOpen}
+       onClose={handleAdvancedMapClose}
+       initialQuery={mapQuery}
+       initialLocation={userLocation}
      />
    </Flex>
  );

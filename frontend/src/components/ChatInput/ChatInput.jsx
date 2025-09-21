@@ -15,8 +15,11 @@ import {
 } from '@chakra-ui/react';
 import { FaPaperPlane, FaPlus, FaMap, FaRoute, FaMapMarkerAlt, FaCompass } from 'react-icons/fa';
 import { HiArrowUp } from "react-icons/hi";
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { translations } from '../../constants';
+import MapSuggestions from '../MapView/MapSuggestions';
+import ServiceMenu from './ServiceMenu';
+import { useServiceToolbar } from '../../hooks/useServiceToolbar';
 
 const ChatInput = ({
   inputText,
@@ -30,12 +33,34 @@ const ChatInput = ({
   onMapClick,
   onRouteClick,
   onLocationClick,
-  onDirectionClick
+  onDirectionClick,
+  onAdvancedMapClick
 }) => {
  const inputRef = useRef(null);
  const textareaRef = useRef(null);
+ const [showMapSuggestions, setShowMapSuggestions] = useState(false);
 
-
+ // Use service toolbar hook
+ const {
+   showServiceToolbar,
+   servicesByCategory,
+   handleServiceSelect,
+   handleServiceClick,
+   toggleToolbar,
+   closeToolbar
+ } = useServiceToolbar({
+   onServiceSelect: (serviceType, suggestion) => {
+     if (suggestion) {
+       setInputText(suggestion);
+     }
+     // You can add additional logic here for different service types
+   },
+   onMapClick,
+   onRouteClick,
+   onLocationClick,
+   onDirectionClick,
+   onAdvancedMapClick
+ });
 
   const bgColor = useColorModeValue('#f7f7f8');
   const inputContainerBg = useColorModeValue('white', 'gray.800');
@@ -50,7 +75,6 @@ const ChatInput = ({
     textareaRef.current?.focus();
   }
 }, [isLoading]);
-
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -70,8 +94,6 @@ const ChatInput = ({
         }, 0);
       };
 
-
-
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -81,9 +103,18 @@ const ChatInput = ({
 
   const canSend = inputText.trim() && !isLoading;
 
+  const handleMapSuggestionClick = (suggestion) => {
+    setInputText(suggestion);
+    setShowMapSuggestions(false);
+  };
+
+  const handleMapMenuClick = () => {
+    setShowMapSuggestions(!showMapSuggestions);
+  };
+
   return (
     <Flex justify="center" px={0} py={5} bg={bgColor}>
-      <Box as="form" onSubmit={onSubmit} w="100%" maxW="700px">
+      <Box as="form" onSubmit={onSubmit} w="100%" maxW="700px" position="relative">
         <Flex
           align="center"
          
@@ -103,33 +134,15 @@ const ChatInput = ({
           }}
           transition="all 0.2s"
         >
-         <Menu>
-            <MenuButton
-              as={IconButton}
-              icon={<FaPlus />}
-              size="sm"
-              variant="ghost"
-              aria-label="more"
-              borderRadius="full"
-              mr={2}
-              color={textColor}
-              _hover={{ bg: useColorModeValue('gray.100', 'gray.600') }}
-            />
-            <MenuList>
-              <MenuItem onClick={onMapClick} icon={<FaMap />}>
-                <Text>Bản đồ</Text>
-              </MenuItem>
-              <MenuItem onClick={onRouteClick} icon={<FaRoute />}>
-                <Text>Tìm đường</Text>
-              </MenuItem>
-              <MenuItem onClick={onLocationClick} icon={<FaMapMarkerAlt />}>
-                <Text>Địa điểm gần đây</Text>
-              </MenuItem>
-              <MenuItem onClick={onDirectionClick} icon={<FaCompass />}>
-                <Text>Hướng dẫn đi lại</Text>
-              </MenuItem>
-            </MenuList>
-          </Menu>
+         <ServiceMenu
+            showServiceToolbar={showServiceToolbar}
+            servicesByCategory={servicesByCategory}
+            onServiceClick={handleServiceClick}
+            onServiceSelect={handleServiceSelect}
+            onToggle={toggleToolbar}
+            onClose={closeToolbar}
+            textColor={textColor}
+          />
 
          <Textarea
               ref={textareaRef}
@@ -156,7 +169,6 @@ const ChatInput = ({
               _disabled={{ opacity: 0.6, cursor: 'text' }}
               flex="1"
             />
-
 
           {config?.features?.voiceEnabled && (
             <Tooltip label={translations[language].voiceAssistant}>
@@ -186,6 +198,14 @@ const ChatInput = ({
             />
           </Tooltip>
         </Flex>
+
+        {/* Map Suggestions */}
+        {showMapSuggestions && (
+          <MapSuggestions
+            onSuggestionClick={handleMapSuggestionClick}
+            onClose={() => setShowMapSuggestions(false)}
+          />
+        )}
       </Box>
     </Flex>
   );

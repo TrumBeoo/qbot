@@ -1,4 +1,4 @@
-// src/pages/Dashboard.jsx
+// src/components/dashboard/Dashboard.jsx
 import {
   Box,
   Grid,
@@ -29,7 +29,6 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  Container,
   Fab,
   Snackbar,
   useTheme,
@@ -53,6 +52,8 @@ import { useNavigate } from 'react-router-dom';
 import { chatbotAPI } from '../../services/api';
 import FeatureAnnouncement from '../common/FeatureAnnouncement';
 import SystemStatus from '../common/SystemStatus';
+import StatsCard from './StatsCard';
+import QuickActionCard from './QuickActionCard';
 
 const DashboardPage = () => {
   const { user } = useAuth();
@@ -247,46 +248,43 @@ const DashboardPage = () => {
     }
   ];
 
-  const recentActivities = [
-    {
-      title: 'Tài liệu "Thông tin du lịch Hạ Long" đã được tải lên',
-      time: '2 giờ trước',
-      icon: UploadIcon,
-      color: theme.palette.success.main
-    },
-    {
-      title: 'Hệ thống đã xử lý 45 chunks dữ liệu mới',
-      time: '3 giờ trước',
-      icon: StorageIcon,
-      color: theme.palette.primary.main
-    },
-    {
-      title: '23 cuộc trò chuyện mới với chatbot',
-      time: 'Hôm nay',
-      icon: MessageIcon,
-      color: theme.palette.secondary.main
-    },
-    {
-      title: 'Hiệu suất chatbot tăng 15% so với tuần trước',
-      time: 'Hôm qua',
-      icon: TrendingUpIcon,
-      color: theme.palette.warning.main
-    }
-  ];
+  // Recent activities will be loaded from API - no mock data
+  const recentActivities = [];
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
+    <Box sx={{ p: 3 }}>
       {/* Feature Announcement */}
       <FeatureAnnouncement />
       
       {/* Header Section */}
-      <Box sx={{ mb: 4 }}>
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: 3, 
+          mb: 3, 
+          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
+          border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+        }}
+      >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Box>
-            <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
+            <Typography 
+              variant="h4" 
+              component="h1" 
+              gutterBottom 
+              sx={{ 
+                fontWeight: 700,
+                color: theme.palette.text.primary,
+                mb: 1
+              }}
+            >
               Chào mừng trở lại, {user?.businessInfo?.businessName || user?.email}!
             </Typography>
-            <Typography variant="body1" color="text.secondary">
+            <Typography 
+              variant="body1" 
+              color="text.secondary"
+              sx={{ fontSize: '1.1rem' }}
+            >
               Quản lý dữ liệu và theo dõi hiệu suất chatbot du lịch Quảng Ninh
             </Typography>
           </Box>
@@ -295,7 +293,11 @@ const DashboardPage = () => {
               variant="outlined"
               startIcon={<RefreshIcon />}
               onClick={handleRefreshData}
-              size="small"
+              sx={{
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 500
+              }}
             >
               Làm mới
             </Button>
@@ -303,7 +305,15 @@ const DashboardPage = () => {
               variant="contained"
               startIcon={<UploadIcon />}
               onClick={() => fileInputRef.current?.click()}
-              size="small"
+              sx={{
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 500,
+                boxShadow: theme.shadows[2],
+                '&:hover': {
+                  boxShadow: theme.shadows[4]
+                }
+              }}
             >
               Tải lên dữ liệu
             </Button>
@@ -318,93 +328,100 @@ const DashboardPage = () => {
         </Box>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            <Typography variant="h6" component="div">Lỗi</Typography>
-            {error}
+          <Alert 
+            severity="error" 
+            sx={{ 
+              mt: 2,
+              borderRadius: 2,
+              '& .MuiAlert-message': {
+                width: '100%'
+              }
+            }}
+          >
+            <Typography variant="subtitle2" component="div" fontWeight="bold">
+              Lỗi
+            </Typography>
+            <Typography variant="body2">
+              {error}
+            </Typography>
           </Alert>
         )}
-      </Box>
+      </Paper>
 
       {/* Quick Actions */}
-      <Paper elevation={1} sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h6" gutterBottom fontWeight="bold">
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: 3, 
+          mb: 3,
+          border: `1px solid ${theme.palette.divider}`,
+          borderRadius: 2
+        }}
+      >
+        <Typography 
+          variant="h6" 
+          gutterBottom 
+          sx={{ 
+            fontWeight: 600,
+            color: theme.palette.text.primary,
+            mb: 2
+          }}
+        >
           Hành động nhanh
         </Typography>
         <Grid container spacing={2}>
           {quickActions.map((action, index) => (
             <Grid item xs={12} sm={6} md={3} key={index}>
-              <Card 
-                sx={{ 
-                  height: '100px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: theme.shadows[4]
-                  }
-                }}
-                onClick={action.action}
-              >
-                <CardContent sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  height: '100%',
-                  p: 2,
-                  '&:last-child': { pb: 2 }
-                }}>
-                  <action.icon sx={{ mr: 2, fontSize: 32, color: theme.palette.primary.main }} />
-                  <Box>
-                    <Typography variant="subtitle2" fontWeight="bold">
-                      {action.title}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {action.subtitle}
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
+              <QuickActionCard
+                title={action.title}
+                subtitle={action.subtitle}
+                icon={action.icon}
+                action={action.action}
+              />
             </Grid>
           ))}
         </Grid>
       </Paper>
 
       {/* Main Stats */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={3} sx={{ mb: 3 }}>
         {statsCards.map((stat, index) => (
           <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card elevation={1}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      {stat.title}
-                    </Typography>
-                    <Typography variant="h4" component="div" fontWeight="bold">
-                      {stat.value}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: stat.color, display: 'flex', alignItems: 'center', mt: 1 }}>
-                      <TrendingUpIcon sx={{ fontSize: 16, mr: 0.5 }} />
-                      {stat.subtitle}
-                    </Typography>
-                  </Box>
-                  <Avatar sx={{ bgcolor: stat.bgColor, width: 56, height: 56 }}>
-                    <stat.icon sx={{ color: stat.color, fontSize: 28 }} />
-                  </Avatar>
-                </Box>
-              </CardContent>
-            </Card>
+            <StatsCard
+              title={stat.title}
+              value={stat.value}
+              subtitle={stat.subtitle}
+              icon={stat.icon}
+              color={stat.color}
+              bgColor={stat.bgColor}
+            />
           </Grid>
         ))}
       </Grid>
 
       {/* System Information */}
       {chatbotStats && (
-        <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid container spacing={3} sx={{ mb: 3 }}>
           {/* Language Distribution */}
           <Grid item xs={12} lg={6}>
-            <Card elevation={1} sx={{ height: '100%' }}>
-              <CardHeader title="Phân bố ngôn ngữ sử dụng" />
-              <CardContent>
+            <Card 
+              elevation={0} 
+              sx={{ 
+                height: '100%',
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: 2
+              }}
+            >
+              <CardHeader 
+                title="Phân bố ngôn ngữ sử dụng"
+                titleTypographyProps={{
+                  variant: 'h6',
+                  fontWeight: 600,
+                  color: theme.palette.text.primary
+                }}
+                sx={{ pb: 1 }}
+              />
+              <CardContent sx={{ pt: 0 }}>
                 {chatbotStats.language_distribution && chatbotStats.language_distribution.length > 0 ? (
                   <Stack spacing={3}>
                     {chatbotStats.language_distribution.map((lang, index) => (
@@ -444,9 +461,24 @@ const DashboardPage = () => {
 
           {/* System Info */}
           <Grid item xs={12} lg={3}>
-            <Card elevation={1} sx={{ height: '100%' }}>
-              <CardHeader title="Thông tin hệ thống" />
-              <CardContent>
+            <Card 
+              elevation={0} 
+              sx={{ 
+                height: '100%',
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: 2
+              }}
+            >
+              <CardHeader 
+                title="Thông tin hệ thống"
+                titleTypographyProps={{
+                  variant: 'h6',
+                  fontWeight: 600,
+                  color: theme.palette.text.primary
+                }}
+                sx={{ pb: 1 }}
+              />
+              <CardContent sx={{ pt: 0 }}>
                 <Stack spacing={2}>
                   <Box>
                     <Typography variant="caption" color="text.secondary">
@@ -507,39 +539,76 @@ const DashboardPage = () => {
       )}
 
       {/* Recent Activity */}
-      <Card elevation={1}>
+      <Card 
+        elevation={0}
+        sx={{
+          border: `1px solid ${theme.palette.divider}`,
+          borderRadius: 2
+        }}
+      >
         <CardHeader 
           title="Hoạt động gần đây"
+          titleTypographyProps={{
+            variant: 'h6',
+            fontWeight: 600,
+            color: theme.palette.text.primary
+          }}
           action={
-            <Button size="small" onClick={() => navigate('/data-management')}>
+            <Button 
+              size="small" 
+              onClick={() => navigate('/data-management')}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500,
+                borderRadius: 2
+              }}
+            >
               Xem tất cả
             </Button>
           }
+          sx={{ pb: 1 }}
         />
-        <CardContent>
-          <List>
-            {recentActivities.map((activity, index) => (
-              <ListItem key={index} sx={{ px: 0 }}>
-                <ListItemAvatar>
-                  <Avatar sx={{ bgcolor: alpha(activity.color, 0.1), width: 40, height: 40 }}>
-                    <activity.icon sx={{ color: activity.color, fontSize: 20 }} />
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={
-                    <Typography variant="body2" fontWeight="medium">
-                      {activity.title}
-                    </Typography>
-                  }
-                  secondary={
-                    <Typography variant="caption" color="text.secondary">
-                      {activity.time}
-                    </Typography>
-                  }
-                />
-              </ListItem>
-            ))}
-          </List>
+        <CardContent sx={{ pt: 0 }}>
+          {recentActivities.length > 0 ? (
+            <List sx={{ p: 0 }}>
+              {recentActivities.map((activity, index) => (
+                <ListItem key={index} sx={{ px: 0, py: 1.5 }}>
+                  <ListItemAvatar>
+                    <Avatar sx={{ bgcolor: alpha(activity.color, 0.1), width: 40, height: 40 }}>
+                      <activity.icon sx={{ color: activity.color, fontSize: 20 }} />
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={
+                      <Typography variant="body2" fontWeight="medium">
+                        {activity.title}
+                      </Typography>
+                    }
+                    secondary={
+                      <Typography variant="caption" color="text.secondary">
+                        {activity.time}
+                      </Typography>
+                    }
+                  />
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Box 
+              sx={{ 
+                textAlign: 'center', 
+                py: 6,
+                color: 'text.secondary'
+              }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Chưa có hoạt động gần đây
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Các hoạt động sẽ được hiển thị tại đây khi có dữ liệu
+              </Typography>
+            </Box>
+          )}
         </CardContent>
       </Card>
 
@@ -549,21 +618,57 @@ const DashboardPage = () => {
         onClose={() => setUploadModalOpen(false)}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            boxShadow: theme.shadows[10]
+          }
+        }}
       >
-        <DialogTitle>
+        <DialogTitle
+          sx={{
+            fontWeight: 600,
+            color: theme.palette.text.primary,
+            borderBottom: `1px solid ${theme.palette.divider}`,
+            pb: 2
+          }}
+        >
           Tải lên dữ liệu mới
           <IconButton
             onClick={() => setUploadModalOpen(false)}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
+            sx={{ 
+              position: 'absolute', 
+              right: 8, 
+              top: 8,
+              color: theme.palette.text.secondary,
+              '&:hover': {
+                bgcolor: alpha(theme.palette.error.main, 0.1),
+                color: theme.palette.error.main
+              }
+            }}
           >
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent>
-          <Stack spacing={3} sx={{ mt: 1 }}>
+        <DialogContent sx={{ pt: 3 }}>
+          <Stack spacing={3}>
             {selectedFile && (
-              <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                <Typography variant="subtitle2" gutterBottom>
+              <Paper 
+                sx={{ 
+                  p: 2, 
+                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                  borderRadius: 2
+                }}
+              >
+                <Typography 
+                  variant="subtitle2" 
+                  gutterBottom
+                  sx={{ 
+                    fontWeight: 600,
+                    color: theme.palette.text.primary
+                  }}
+                >
                   File đã chọn:
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -607,14 +712,37 @@ const DashboardPage = () => {
           </Stack>
         </DialogContent>
         
-        <DialogActions>
-          <Button onClick={() => setUploadModalOpen(false)} disabled={isUploading}>
+        <DialogActions 
+          sx={{ 
+            p: 3, 
+            borderTop: `1px solid ${theme.palette.divider}`,
+            gap: 2
+          }}
+        >
+          <Button 
+            onClick={() => setUploadModalOpen(false)} 
+            disabled={isUploading}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 500,
+              borderRadius: 2
+            }}
+          >
             Hủy
           </Button>
           <Button
             variant="contained"
             onClick={handleFileUpload}
             disabled={isUploading}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 500,
+              borderRadius: 2,
+              boxShadow: theme.shadows[2],
+              '&:hover': {
+                boxShadow: theme.shadows[4]
+              }
+            }}
           >
             {isUploading ? 'Đang tải lên...' : 'Tải lên'}
           </Button>
@@ -636,7 +764,7 @@ const DashboardPage = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 };
 

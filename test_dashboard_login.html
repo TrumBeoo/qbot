@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Dashboard Login</title>
+</head>
+<body>
+    <h1>Test Dashboard Login</h1>
+    <div id="result"></div>
+    
+    <script>
+        async function testLogin() {
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@servicehub.com',
+                        password: 'Admin123!'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    localStorage.setItem('token', data.token);
+                    document.getElementById('result').innerHTML = `
+                        <h2>Login Successful!</h2>
+                        <p>Token saved to localStorage</p>
+                        <p>You can now access the Dashboard at: <a href="http://localhost:5173" target="_blank">http://localhost:5173</a></p>
+                        <p>Admin Email: admin@servicehub.com</p>
+                        <p>Admin Password: Admin123!</p>
+                    `;
+                } else {
+                    document.getElementById('result').innerHTML = `
+                        <h2>Login Failed</h2>
+                        <p>Error: ${data.error || 'Unknown error'}</p>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <h2>Login Error</h2>
+                    <p>Error: ${error.message}</p>
+                `;
+            }
+        }
+        
+        // Auto-run test
+        testLogin();
+    </script>
+</body>
+</html>

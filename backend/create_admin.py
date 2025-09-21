@@ -14,7 +14,7 @@ from bson import ObjectId
 # Add the backend directory to Python path
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend'))
 
-from db import admin_user_collection, mongo_db
+from MongoDB.db import admin_user_collection, mongo_db
 
 def hash_password(password):
     """Hash password using SHA-256 with salt"""

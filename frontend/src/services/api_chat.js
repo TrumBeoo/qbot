@@ -29,6 +29,62 @@ class ApiService {
       if (language) requestBody.language = language;
       if (conversationId && isAuth) requestBody.conversation_id = conversationId;
 
+      console.log(`🚀 Sending message to ${endpoint}:`, { 
+        message: message.substring(0, 50) + '...', 
+        language, 
+        conversationId,
+        isAuth 
+      });
+
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        method: 'POST',
+        headers: isAuth ? this.getAuthHeaders() : { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        console.log('🖼️ API Response images:', data.images?.length || 0, data.images);
+        return {
+          success: true,
+          message: data.response,
+          language: data.language,
+          images: data.images || []
+        };
+      } else {
+        throw new Error(data.message || 'Unknown error occurred');
+      }
+    } catch (error) {
+      console.error('API Error:', error);
+      return {
+        success: false,
+        error: error.message || 'Không thể kết nối đến server. Vui lòng thử lại sau.'
+      };
+    }
+  }
+
+  // Send voice message (authenticated or public)
+  async sendVoiceMessage(text, language = null, conversationId = null) {
+    try {
+      const isAuth = this.isAuthenticated();
+      const endpoint = isAuth ? '/voice-chat-authenticated' : '/voice-chat';
+      
+      const requestBody = { text };
+      if (language) requestBody.language = language;
+      if (conversationId && isAuth) requestBody.conversation_id = conversationId;
+
+      console.log(`🎤 Sending voice message to ${endpoint}:`, { 
+        text: text.substring(0, 50) + '...', 
+        language, 
+        conversationId,
+        isAuth 
+      });
+
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         method: 'POST',
         headers: isAuth ? this.getAuthHeaders() : { 'Content-Type': 'application/json' },
@@ -45,13 +101,14 @@ class ApiService {
         return {
           success: true,
           message: data.response,
-          language: data.language
+          language: data.language,
+          audio: data.audio
         };
       } else {
         throw new Error(data.message || 'Unknown error occurred');
       }
     } catch (error) {
-      console.error('API Error:', error);
+      console.error('Voice API Error:', error);
       return {
         success: false,
         error: error.message || 'Không thể kết nối đến server. Vui lòng thử lại sau.'

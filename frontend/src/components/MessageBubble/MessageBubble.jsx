@@ -10,7 +10,16 @@ import {
   useColorModeValue,
   Code,
   Textarea,
+  Image,
+  SimpleGrid,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
 } from '@chakra-ui/react';
+import '../../App.css';
 import {
   FaCopy,
   FaThumbsUp,
@@ -26,8 +35,26 @@ const MessageBubble = ({ message, language, config }) => {
   const [isCopied, setIsCopied] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [hasTyped, setHasTyped] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const isUser = message.sender === 'user';
-  const isNewMessage = message.timestamp && (Date.now() - new Date(message.timestamp).getTime()) < 5000 && !hasTyped;
+  const isNewMessage = message.timestamp && (Date.now() - new Date(message.timestamp).getTime()) < 5000 && !hasTyped && message.sender === 'bot';
+  
+  // Debug log
+  console.log('🔍 MessageBubble render:', {
+    sender: message.sender,
+    hasImages: !!message.images,
+    imageCount: message.images?.length || 0,
+    isNewMessage,
+    hasTyped,
+    showActions,
+    messageId: message.id
+  });
+  
+  // Additional debug for images
+  if (message.images && message.images.length > 0) {
+    console.log('🖼️ Images in message:', message.images.map(img => ({ url: img.url, caption: img.caption })));
+  }
   
   // User message colors (keep original bubble design)
   const userBgColor = useColorModeValue('blue.500', 'blue.600');
@@ -47,6 +74,60 @@ const MessageBubble = ({ message, language, config }) => {
    } catch (error) {
      console.error('Failed to copy text:', error);
    }
+ };
+
+ const handleImageClick = (imageUrl) => {
+   setSelectedImage(imageUrl);
+   onOpen();
+ };
+
+ const renderImages = (images) => {
+   console.log('🎨 MessageBubble renderImages called with:', images);
+   if (!images || images.length === 0) {
+     console.log('❌ No images to render');
+     return null;
+   }
+
+   console.log('✅ Rendering', images.length, 'images');
+   
+   // Determine grid layout class based on image count
+   let gridClass = 'single';
+   if (images.length === 2) gridClass = 'double';
+   else if (images.length === 3) gridClass = 'triple';
+   else if (images.length >= 4) gridClass = 'quad';
+   
+   return (
+     <Box mt={3}>
+       <Box className={`message-images ${gridClass}`}>
+         {images.slice(0, 4).map((image, index) => (
+           <Box key={index} position="relative">
+             <Image
+               src={image.url}
+               alt={image.alt || `Image ${index + 1}`}
+               className="message-image"
+               onClick={() => handleImageClick(image.url)}
+               loading="lazy"
+             />
+             {image.caption && (
+               <Text
+                 fontSize="xs"
+                 color="gray.600"
+                 mt={1}
+                 textAlign="center"
+               >
+                 {image.caption}
+               </Text>
+             )}
+           </Box>
+         ))}
+       </Box>
+       {images.length > 4 && (
+         <Text fontSize="xs" color="gray.500" mt={2} textAlign="center">
+           +{images.length - 4} more images
+         </Text>
+       )}
+     </Box>
+   );
  };
 
  const formatMessageText = (text) => {
@@ -145,34 +226,44 @@ const MessageBubble = ({ message, language, config }) => {
              transition="border-color 0.2s"
              overflow="hidden"
            >
-             {message.text.includes('```') ? (
-               <Box fontSize="sm" lineHeight="1.6" color={botTextColor} p={4}>
-                 {formatMessageText(message.text)}
+             {/* Always show images first - persistent display */}
+             {message.images && message.images.length > 0 && (
+               <Box px={4} pt={3} pb={message.text ? 2 : 3}>
+                 {renderImages(message.images)}
                </Box>
-             ) : isNewMessage ? (
-               <Box px={4} py={3}>
-                 <TypingText
-                   text={message.text}
-                   speed={15}
-                   color={botTextColor}
-                   onDone={() => {
-                     setShowActions(true);
-                     setHasTyped(true);
-                   }}
-                 />
-               </Box>
-             ) : (
-               <Text
-                  whiteSpace="pre-wrap"
-                  color={botTextColor}
-                  fontSize="md"
-                  lineHeight="1.6"
-                  fontFamily="inherit"
-                  px={4}
-                  py={3}
-                >
-                  {message.text}
-                </Text>
+             )}
+             
+             {/* Then show text content - only if there's text */}
+             {message.text && (
+               message.text.includes('```') ? (
+                 <Box fontSize="sm" lineHeight="1.6" color={botTextColor} p={4}>
+                   {formatMessageText(message.text)}
+                 </Box>
+               ) : isNewMessage ? (
+                 <Box px={4} py={3}>
+                   <TypingText
+                     text={message.text}
+                     speed={15}
+                     color={botTextColor}
+                     onDone={() => {
+                       setShowActions(true);
+                       setHasTyped(true);
+                     }}
+                   />
+                 </Box>
+               ) : (
+                 <Text
+                    whiteSpace="pre-wrap"
+                    color={botTextColor}
+                    fontSize="md"
+                    lineHeight="1.6"
+                    fontFamily="inherit"
+                    px={4}
+                    py={3}
+                  >
+                    {message.text}
+                  </Text>
+               )
              )}
            </Box>
          )}
@@ -219,6 +310,25 @@ const MessageBubble = ({ message, language, config }) => {
          )}
        </VStack>
      </HStack>
+
+     {/* Image Modal */}
+     <Modal isOpen={isOpen} onClose={onClose} size="xl">
+       <ModalOverlay />
+       <ModalContent>
+         <ModalCloseButton />
+         <ModalBody p={0}>
+           {selectedImage && (
+             <Image
+               src={selectedImage}
+               alt="Enlarged view"
+               w="full"
+               h="auto"
+               borderRadius="md"
+             />
+           )}
+         </ModalBody>
+       </ModalContent>
+     </Modal>
    </VStack>
  );
 };

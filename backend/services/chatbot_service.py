@@ -5,13 +5,24 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from RAG.rag_engine import get_rag_engine
 from RAG.loader import DocumentLoader
-from db import chat_collection, users_collection
+from MongoDB.db import users_collection
 import logging
+import mysql.connector
 
 logger = logging.getLogger(__name__)
 
 class ChatbotService:
     """Service for managing chatbot operations and statistics"""
+    
+    @staticmethod
+    def get_mysql_connection():
+        """Get MySQL database connection"""
+        return mysql.connector.connect(
+            host=os.getenv('MYSQL_HOST', 'localhost'),
+            user=os.getenv('MYSQL_USER', 'root'),
+            password=os.getenv('MYSQL_PASSWORD', ''),
+            database=os.getenv('MYSQL_DATABASE', 'chatbot')
+        )
     
     @staticmethod
     def get_chatbot_stats() -> Dict[str, Any]:
@@ -20,33 +31,35 @@ class ChatbotService:
             rag_engine = get_rag_engine()
             rag_stats = rag_engine.get_stats()
             
-            # Get chat statistics from database
-            total_conversations = chat_collection.count_documents({})
+            # Get chat statistics from MySQL database
+            connection = ChatbotService.get_mysql_connection()
+            cursor = connection.cursor(dictionary=True)
+            
+            # Get total conversations
+            cursor.execute("SELECT COUNT(*) as total FROM conversations")
+            total_conversations = cursor.fetchone()['total']
             
             # Get conversations from last 30 days
             thirty_days_ago = datetime.now() - timedelta(days=30)
-            recent_conversations = chat_collection.count_documents({
-                "updated_at": {"$gte": thirty_days_ago}
-            })
+            cursor.execute(
+                "SELECT COUNT(*) as recent FROM conversations WHERE updated_at >= %s",
+                (thirty_days_ago,)
+            )
+            recent_conversations = cursor.fetchone()['recent']
             
             # Get total messages count
-            pipeline = [
-                {"$unwind": "$messages"},
-                {"$group": {"_id": None, "total_messages": {"$sum": 1}}}
-            ]
-            message_result = list(chat_collection.aggregate(pipeline))
-            total_messages = message_result[0]["total_messages"] if message_result else 0
+            cursor.execute("SELECT COUNT(*) as total FROM messages")
+            total_messages = cursor.fetchone()['total']
             
             # Get active users (users who have conversations)
-            active_users = len(chat_collection.distinct("user_id"))
+            cursor.execute("SELECT COUNT(DISTINCT user_id) as active FROM conversations")
+            active_users = cursor.fetchone()['active']
             
             # Get language distribution
-            language_pipeline = [
-                {"$unwind": "$messages"},
-                {"$group": {"_id": "$messages.language", "count": {"$sum": 1}}},
-                {"$sort": {"count": -1}}
-            ]
-            language_stats = list(chat_collection.aggregate(language_pipeline))
+            cursor.execute(
+                "SELECT language, COUNT(*) as count FROM messages WHERE language IS NOT NULL GROUP BY language ORDER BY count DESC"
+            )
+            language_stats = [{'_id': row['language'], 'count': row['count']} for row in cursor.fetchall()]
             
             # Get daily conversation stats for last 7 days
             daily_stats = []
@@ -55,17 +68,19 @@ class ChatbotService:
                 start_of_day = date.replace(hour=0, minute=0, second=0, microsecond=0)
                 end_of_day = start_of_day + timedelta(days=1)
                 
-                daily_count = chat_collection.count_documents({
-                    "updated_at": {
-                        "$gte": start_of_day,
-                        "$lt": end_of_day
-                    }
-                })
+                cursor.execute(
+                    "SELECT COUNT(*) as daily_count FROM conversations WHERE updated_at >= %s AND updated_at < %s",
+                    (start_of_day, end_of_day)
+                )
+                daily_count = cursor.fetchone()['daily_count']
                 
                 daily_stats.append({
                     "date": start_of_day.strftime("%Y-%m-%d"),
                     "conversations": daily_count
                 })
+            
+            cursor.close()
+            connection.close()
             
             return {
                 "rag_system": rag_stats,

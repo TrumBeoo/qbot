@@ -2,7 +2,7 @@ import jwt
 import hashlib
 from datetime import datetime, timedelta
 from bson import ObjectId
-from db import admin_user_collection
+from MongoDB.db import admin_user_collection
 import os
 
 class AdminAuthService:

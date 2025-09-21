@@ -1,4 +1,5 @@
 // src/components/Sidebar/Sidebar.jsx
+import React, { useState } from 'react';
 import {
   Box,
   VStack,
@@ -32,6 +33,7 @@ import {
 } from 'react-icons/fa';
 import { translations } from '../../constants';
 import ConversationList from './ConversationList';
+import AuthModal from '../Auth/AuthModal';
 
 const Sidebar = ({
   isOpen,
@@ -46,7 +48,11 @@ const Sidebar = ({
   language,
   onLogout,
   onProfile,
+  onLogin,
+  onRegister,
+  onSocialLogin,
 }) => {
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
 
@@ -90,9 +96,9 @@ const Sidebar = ({
               />
             </Box>
 
-            {/* User Menu */}
-            {user && (
-              <Box w="full" p={4} borderTopWidth="1px" borderColor={borderColor}>
+            {/* User Menu or Login Button */}
+            <Box w="full" p={4} borderTopWidth="1px" borderColor={borderColor}>
+              {user ? (
                 <Menu>
                   <MenuButton as={Button} variant="ghost" w="full" p={2}>
                     <HStack spacing={3} w="full">
@@ -118,11 +124,30 @@ const Sidebar = ({
                     </MenuItem>
                   </MenuList>
                 </Menu>
-              </Box>
-            )}
+              ) : (
+                <Button
+                  colorScheme="blue"
+                  w="full"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  size="sm"
+                >
+                  {translations[language].login || "Đăng nhập"}
+                </Button>
+              )}
+            </Box>
           </VStack>
         </DrawerBody>
       </DrawerContent>
+      
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLogin={onLogin}
+        onRegister={onRegister}
+        onSocialLogin={onSocialLogin}
+        language={language}
+      />
     </Drawer>
   );
 };

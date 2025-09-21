@@ -34,6 +34,11 @@ Frontend sẽ chạy tại: http://localhost:5173 (hoặc port khác được hi
 python test_api.py
 ```
 
+Để test MongoDB sync:
+```bash
+python test_mongodb_sync.py
+```
+
 ## 📁 Cấu trúc dự án
 
 ```
@@ -58,6 +63,11 @@ chatbot/
 ### Backend (.env)
 ```
 GROQ_API_KEY=your_groq_api_key_here
+MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/database
+MYSQL_HOST=localhost
+MYSQL_USER=root
+MYSQL_PASSWORD=your_password
+MYSQL_DATABASE=chatbot
 ```
 
 ### Frontend (.env)
@@ -92,6 +102,13 @@ Kiểm tra trạng thái server
 }
 ```
 
+### MongoDB Data Management
+- `GET /api/dashboard/mongodb/sync-status` - Lấy trạng thái đồng bộ
+- `POST /api/dashboard/mongodb/sync-all` - Đồng bộ tất cả file
+- `POST /api/dashboard/mongodb/force-resync` - Đồng bộ lại từ đầu
+- `POST /api/dashboard/mongodb/sync-file/<filename>` - Đồng bộ file cụ thể
+- `GET /api/dashboard/mongodb/file/<filename>` - Lấy nội dung file từ MongoDB
+
 ## 🎯 Tính năng
 
 - ✅ Chat interface với React + Chakra UI
@@ -102,6 +119,10 @@ Kiểm tra trạng thái server
 - ✅ Multi-language support (Vietnamese/English)
 - ✅ Message history
 - ✅ Copy message functionality
+- ✅ Dashboard quản lý dữ liệu
+- ✅ MongoDB integration cho data storage
+- ✅ MySQL integration cho chat history
+- ✅ File upload và sync với MongoDB
 
 ## 🤖 Chatbot Capabilities
 

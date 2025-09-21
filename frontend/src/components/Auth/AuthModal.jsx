@@ -296,10 +296,10 @@ const AuthModal = ({
       onClose={handleModalClose} 
       size="md" 
       closeOnOverlayClick={!isLoading}
-      motionPreset="slideInBottom"
+      isCentered
     >
       <ModalOverlay backdropFilter="blur(10px)" bg="blackAlpha.600" />
-      <ModalContent bg={modalBg} color={modalColor} borderRadius="xl" mx={4}>
+      <ModalContent bg={modalBg} color={modalColor} borderRadius="xl" mx={5}>
         <ModalHeader textAlign="center" pb={2}>
           <VStack spacing={2}>
             <Text fontSize="2xl" fontWeight="bold">
@@ -322,26 +322,30 @@ const AuthModal = ({
 
 
           <VStack spacing={6}>
-            {/* Social Login Buttons */}
-            <Box width="100%" position="relative">
-              <SocialLoginButtons
-                onGoogleSuccess={handleGoogleSuccess}
-                onFacebookSuccess={handleFacebookSuccess}
-                onError={handleSocialLoginError}
-                language={language}
-                onLanguageChange={onLanguageChange}
-                isLoading={isLoading}
-              />
-            </Box>
+            {/* Social Login Buttons - Only show in login mode */}
+            {authMode === 'login' && (
+              <>
+                <Box width="100%" position="relative">
+                  <SocialLoginButtons
+                    onGoogleSuccess={handleGoogleSuccess}
+                    onFacebookSuccess={handleFacebookSuccess}
+                    onError={handleSocialLoginError}
+                    language={language}
+                    onLanguageChange={onLanguageChange}
+                    isLoading={isLoading}
+                  />
+                </Box>
 
-            {/* Divider */}
-            <HStack width="100%">
-              <Divider />
-              <Text fontSize="sm" color="gray.500" px={3} whiteSpace="nowrap">
-                {translations[language]?.orUseEmail || "or use email"}
-              </Text>
-              <Divider />
-            </HStack>
+                {/* Divider */}
+                <HStack width="100%">
+                  <Divider />
+                  <Text fontSize="sm" color="gray.500" px={3} whiteSpace="nowrap">
+                    {translations[language]?.orUseEmail || "or use email"}
+                  </Text>
+                  <Divider />
+                </HStack>
+              </>
+            )}
 
             {/* Email/Password Form */}
             <Box as="form" onSubmit={handleAuthSubmit} width="100%">
