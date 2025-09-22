@@ -320,6 +320,55 @@ def get_chatbot_stats(current_user_id):
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/dashboard/analytics/comprehensive', methods=['GET'])
+@token_required
+def get_comprehensive_analytics(current_user_id):
+    """Get comprehensive analytics data"""
+    try:
+        from services.analytics_service import AnalyticsService
+        analytics = AnalyticsService.get_comprehensive_analytics()
+        return jsonify({
+            'status': 'success',
+            'data': analytics
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/analytics/user', methods=['GET'])
+@token_required
+def get_user_analytics(current_user_id):
+    """Get analytics data for current user"""
+    try:
+        from services.analytics_service import AnalyticsService
+        analytics = AnalyticsService.get_user_analytics(current_user_id)
+        return jsonify({
+            'status': 'success',
+            'data': analytics
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/analytics/insights', methods=['GET'])
+@token_required
+def get_conversation_insights(current_user_id):
+    """Get conversation insights for current user"""
+    try:
+        from services.analytics_service import AnalyticsService
+        # Get user-specific insights
+        user_insights = AnalyticsService.get_conversation_insights(current_user_id)
+        # Get system-wide insights for comparison
+        system_insights = AnalyticsService.get_conversation_insights()
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'user_insights': user_insights,
+                'system_insights': system_insights
+            }
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 # Image management endpoints
 
 @app.route('/api/dashboard/images/upload', methods=['POST'])
@@ -974,10 +1023,302 @@ def search_similar():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+# Memory-Enhanced Chat Endpoints
+
+@app.route('/chat-with-memory', methods=['POST'])
+@token_required
+def chat_with_memory(current_user_id):
+    """Chat endpoint with memory integration"""
+    try:
+        data = request.get_json(force=True)
+        message = (data or {}).get('message', '').strip()
+        conversation_id = (data or {}).get('conversation_id')
+        language = (data or {}).get('language')
+        memory_type = (data or {}).get('memory_type', 'buffer_window')
+        
+        print(f"🧠 Memory chat request: user={current_user_id}, conv={conversation_id}, memory={memory_type}")
+        
+        if not message:
+            return jsonify({'status': 'error', 'message': 'Missing message'}), 400
+        
+        if not conversation_id:
+            return jsonify({'status': 'error', 'message': 'Missing conversation_id'}), 400
+        
+        from services.enhanced_chat_service import enhanced_chat_service
+        
+        result = enhanced_chat_service.chat_with_memory(
+            conversation_id=conversation_id,
+            user_id=current_user_id,
+            user_message=message,
+            language=language,
+            memory_type=memory_type
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        print(f"❌ Memory chat error: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/memory/conversation-context/<conversation_id>', methods=['GET'])
+@token_required
+def get_conversation_context(current_user_id, conversation_id):
+    """Get conversation context from memory"""
+    try:
+        memory_type = request.args.get('memory_type', 'buffer_window')
+        
+        from services.enhanced_chat_service import enhanced_chat_service
+        
+        result = enhanced_chat_service.get_conversation_context(
+            conversation_id=conversation_id,
+            user_id=current_user_id,
+            memory_type=memory_type
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/memory/user-preferences', methods=['GET'])
+@token_required
+def get_user_preferences(current_user_id):
+    """Get user preferences analysis"""
+    try:
+        from services.enhanced_chat_service import enhanced_chat_service
+        
+        result = enhanced_chat_service.get_user_preferences(current_user_id)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/memory/clear/<conversation_id>', methods=['DELETE'])
+@token_required
+def clear_conversation_memory(current_user_id, conversation_id):
+    """Clear conversation memory"""
+    try:
+        memory_type = request.args.get('memory_type', 'buffer_window')
+        
+        from services.enhanced_chat_service import enhanced_chat_service
+        
+        result = enhanced_chat_service.clear_conversation_memory(
+            conversation_id=conversation_id,
+            user_id=current_user_id,
+            memory_type=memory_type
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/memory/stats', methods=['GET'])
+@token_required
+def get_memory_stats(current_user_id):
+    """Get memory system statistics"""
+    try:
+        include_user_stats = request.args.get('include_user', 'true').lower() == 'true'
+        
+        from services.enhanced_chat_service import enhanced_chat_service
+        
+        result = enhanced_chat_service.get_memory_stats(
+            current_user_id if include_user_stats else None
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/memory/cleanup', methods=['POST'])
+@token_required
+def cleanup_old_memories(current_user_id):
+    """Cleanup old memories"""
+    try:
+        data = request.get_json(force=True)
+        days_old = (data or {}).get('days_old', 30)
+        
+        from services.enhanced_chat_service import enhanced_chat_service
+        
+        result = enhanced_chat_service.cleanup_old_memories(days_old)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/memory/conversation-summary/<conversation_id>', methods=['GET'])
+@token_required
+def get_conversation_summary(current_user_id, conversation_id):
+    """Get conversation summary"""
+    try:
+        language = request.args.get('language', 'vi')
+        
+        from services.enhanced_chat_service import enhanced_chat_service
+        
+        result = enhanced_chat_service.get_conversation_summary(
+            conversation_id=conversation_id,
+            user_id=current_user_id,
+            language=language
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/memory/follow-up-suggestions/<conversation_id>', methods=['GET'])
+@token_required
+def get_follow_up_suggestions(current_user_id, conversation_id):
+    """Get follow-up question suggestions"""
+    try:
+        language = request.args.get('language', 'vi')
+        
+        from services.enhanced_rag_service import enhanced_rag_service
+        
+        suggestions = enhanced_rag_service.suggest_follow_up_questions(
+            conversation_id=conversation_id,
+            user_id=current_user_id,
+            language=language
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'conversation_id': conversation_id,
+                'suggestions': suggestions,
+                'language': language
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# User Management API endpoints
+
+@app.route('/api/users', methods=['GET'])
+@token_required
+def get_users(current_user_id):
+    """Get all users"""
+    try:
+        from services.user_management_service import UserManagementService
+        result = UserManagementService.get_all_users()
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 500
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/users', methods=['POST'])
+@token_required
+def create_user(current_user_id):
+    """Create new user"""
+    try:
+        data = request.get_json(force=True)
+        
+        from services.user_management_service import UserManagementService
+        result = UserManagementService.create_user(data)
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 400
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/users/<user_id>', methods=['PUT'])
+@token_required
+def update_user(current_user_id, user_id):
+    """Update existing user"""
+    try:
+        data = request.get_json(force=True)
+        
+        from services.user_management_service import UserManagementService
+        result = UserManagementService.update_user(user_id, data)
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 400
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/users/<user_id>', methods=['DELETE'])
+@token_required
+def delete_user(current_user_id, user_id):
+    """Delete user"""
+    try:
+        from services.user_management_service import UserManagementService
+        result = UserManagementService.delete_user(user_id)
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 400
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/users/<user_id>/permissions', methods=['PUT'])
+@token_required
+def update_user_permissions(current_user_id, user_id):
+    """Update user permissions"""
+    try:
+        data = request.get_json(force=True)
+        permissions = data.get('permissions', {})
+        
+        from services.user_management_service import UserManagementService
+        result = UserManagementService.update_user_permissions(user_id, permissions)
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 400
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/users/<user_id>/permissions', methods=['GET'])
+@token_required
+def get_user_permissions(current_user_id, user_id):
+    """Get user permissions"""
+    try:
+        from services.user_management_service import UserManagementService
+        result = UserManagementService.get_user_permissions(user_id)
+        
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 404
+        
+        return jsonify({
+            'status': 'success',
+            'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 if __name__ == '__main__':
     print('🚀 Chat API is ready on http://0.0.0.0:5000')
     print('🔐 Authentication endpoints available at /api/auth/*')
     print('💬 Chat history endpoints available at /api/chat/*')
+    print('🧠 Memory-enhanced chat available at /chat-with-memory')
+    print('🧠 Memory management endpoints available at /api/memory/*')
     print('🖼️ Image management endpoints available at /api/dashboard/images/*')
     print('📁 Data file management endpoints available at /api/dashboard/data-files/*')
     app.run(host='0.0.0.0', port=5000, debug=True)

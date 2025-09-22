@@ -46,6 +46,9 @@ export const authAPI = {
 // Dashboard API for real analytics data
 export const dashboardAPI = {
   getRealAnalyticsData: () => api.get('/dashboard/real-analytics'),
+  getComprehensiveAnalytics: () => api.get('/dashboard/analytics/comprehensive'),
+  getUserAnalytics: () => api.get('/dashboard/analytics/user'),
+  getConversationInsights: () => api.get('/dashboard/analytics/insights'),
 };
 
 export const chatbotAPI = {
@@ -87,6 +90,16 @@ export const servicesAPI = {
   addService: (serviceData) => api.post('/services', serviceData),
   updateService: (id, serviceData) => api.put(`/services/${id}`, serviceData),
   deleteService: (id) => api.delete(`/services/${id}`),
+};
+
+// User management API
+export const usersAPI = {
+  getUsers: () => api.get('/users'),
+  createUser: (userData) => api.post('/users', userData),
+  updateUser: (id, userData) => api.put(`/users/${id}`, userData),
+  deleteUser: (id) => api.delete(`/users/${id}`),
+  updateUserPermissions: (id, permissions) => api.put(`/users/${id}/permissions`, { permissions }),
+  getUserPermissions: (id) => api.get(`/users/${id}/permissions`),
 };
 
 export { api };

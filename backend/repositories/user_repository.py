@@ -5,21 +5,30 @@ from models.user import User
 
 class UserRepository:
     @staticmethod
+    def get_all_users():
+        """Get all users"""
+        users = list(users_collection.find({}))
+        return users
+    
+    @staticmethod
     def create_user(user_data):
         """Create a new user"""
-        user = User(user_data)
+        if isinstance(user_data, User):
+            user = user_data
+        else:
+            user = User(user_data)
+        
         user.created_at = datetime.utcnow()
         user.updated_at = datetime.utcnow()
         
         result = users_collection.insert_one(user.to_db_dict())
-        user._id = result.inserted_id
-        return user
+        return result.inserted_id
     
     @staticmethod
     def find_by_email(email):
         """Find user by email"""
         user_data = users_collection.find_one({'email': email.lower()})
-        return User(user_data) if user_data else None
+        return user_data
     
     @staticmethod
     def find_by_id(user_id):
@@ -28,7 +37,7 @@ class UserRepository:
             user_id = ObjectId(user_id)
         
         user_data = users_collection.find_one({'_id': user_id})
-        return User(user_data) if user_data else None
+        return user_data
     
     @staticmethod
     def find_by_google_id(google_id):

@@ -8,14 +8,15 @@ import Layout from './components/common/Layout';
 
 // Components
 import LoginPage from './components/auth/Login';
-import DashboardPage from './components/dashboard/Dashboard';
-import AnalyticsPage from './components/analytics/AnalyticsWithCharts';
+import DashboardPage from './components/dashboard/EnhancedDashboard';
+import AnalyticsPage from './components/analytics/RealTimeAnalytics';
 import ProfilePage from './components/profile/Profile';
 import ServicesPage from './components/services/Services';
 import AddService from './components/services/AddService';
 import EditService from './components/services/EditService';
 import DataFileManagement from './components/data/DataFileManagement';
 import ImageManagement from './components/images/ImageManagement';
+import UserManagement from './components/users/UserManagement';
 import PlaceholderPage from './components/common/PlaceholderPage';
 
 // MUI theme customization
@@ -158,6 +159,17 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <ImageManagement />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <UserManagement />
                   </Layout>
                 </ProtectedRoute>
               }

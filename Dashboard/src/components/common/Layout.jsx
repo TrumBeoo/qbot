@@ -33,7 +33,8 @@ import {
   Person as PersonIcon,
   Storage as StorageIcon,
   Chat as ChatIcon,
-  Image as ImageIcon
+  Image as ImageIcon,
+  People as PeopleIcon
 } from '@mui/icons-material';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -43,10 +44,11 @@ const drawerWidth = 240;
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+  { name: 'Quản lý người dùng', href: '/users', icon: PeopleIcon },
   { name: 'Quản lý ảnh', href: '/images', icon: ImageIcon },
   { name: 'Quản lý dữ liệu', href: '/data-files', icon: StorageIcon },
   { name: 'Dịch vụ', href: '/services', icon: DashboardIcon },
-  { name: 'Báo cáo', href: '/analytics', icon: BarChartIcon },
+  { name: 'Phân tích', href: '/analytics', icon: BarChartIcon },
   { name: 'Hồ sơ', href: '/profile', icon: PersonIcon },
 ];
 
@@ -216,7 +218,7 @@ const Layout = ({ children }) => {
               fontFamily: 'monospace'
             }}
           >
-            ServiceHub
+            QBot Admin
           </Typography>
 
           {/* Desktop spacer */}
