@@ -3,10 +3,6 @@
  */
 
 export const SERVICE_TYPES = {
-  MAP: 'map',
-  ROUTE: 'route',
-  LOCATION: 'location',
-  DIRECTION: 'direction',
   HOTEL: 'hotel',
   RESTAURANT: 'restaurant',
   ATTRACTION: 'attraction',
@@ -26,10 +22,6 @@ export const generateServiceQuery = (serviceType, suggestion, location = 'Quản
   }
 
   const queryTemplates = {
-    [SERVICE_TYPES.MAP]: `Bản đồ du lịch ${location}`,
-    [SERVICE_TYPES.ROUTE]: `Tìm đường đi tối ưu tại ${location}`,
-    [SERVICE_TYPES.LOCATION]: `Địa điểm tham quan gần đây tại ${location}`,
-    [SERVICE_TYPES.DIRECTION]: `Hướng dẫn đi lại tại ${location}`,
     [SERVICE_TYPES.HOTEL]: `Khách sạn tốt nhất tại ${location}`,
     [SERVICE_TYPES.RESTAURANT]: `Nhà hàng ngon tại ${location}`,
     [SERVICE_TYPES.ATTRACTION]: `Điểm tham quan nổi tiếng tại ${location}`,
@@ -47,25 +39,16 @@ export const generateServiceQuery = (serviceType, suggestion, location = 'Quản
  * Check if service requires special handling
  */
 export const requiresSpecialHandling = (serviceType) => {
-  const specialServices = [
-    SERVICE_TYPES.MAP,
-    SERVICE_TYPES.ROUTE,
-    SERVICE_TYPES.LOCATION,
-    SERVICE_TYPES.DIRECTION
-  ];
-  
-  return specialServices.includes(serviceType);
+  return false; // No special handling needed after removing map services
 };
 
 /**
  * Get service category
  */
 export const getServiceCategory = (serviceType) => {
-  const navigationServices = [SERVICE_TYPES.MAP, SERVICE_TYPES.ROUTE, SERVICE_TYPES.LOCATION, SERVICE_TYPES.DIRECTION];
   const tourismServices = [SERVICE_TYPES.HOTEL, SERVICE_TYPES.RESTAURANT, SERVICE_TYPES.ATTRACTION, SERVICE_TYPES.SHOPPING];
   const utilityServices = [SERVICE_TYPES.TRANSPORT, SERVICE_TYPES.WEATHER, SERVICE_TYPES.INFO, SERVICE_TYPES.TICKET];
 
-  if (navigationServices.includes(serviceType)) return 'navigation';
   if (tourismServices.includes(serviceType)) return 'tourism';
   if (utilityServices.includes(serviceType)) return 'utility';
   
@@ -108,10 +91,6 @@ export const validateServiceConfig = (config) => {
  */
 export const getDefaultSuggestions = (serviceType) => {
   const defaultSuggestions = {
-    [SERVICE_TYPES.MAP]: ['Vịnh Hạ Long', 'Đảo Cát Bà', 'Yên Tử'],
-    [SERVICE_TYPES.ROUTE]: ['Từ Hà Nội đến Hạ Long', 'Lộ trình 1 ngày'],
-    [SERVICE_TYPES.LOCATION]: ['Nhà hàng gần đây', 'Khách sạn 4 sao'],
-    [SERVICE_TYPES.DIRECTION]: ['Cách đi bằng xe bus', 'Thuê xe máy'],
     [SERVICE_TYPES.HOTEL]: ['Khách sạn 5 sao', 'Resort view biển'],
     [SERVICE_TYPES.RESTAURANT]: ['Hải sản tươi sống', 'Đặc sản địa phương'],
     [SERVICE_TYPES.ATTRACTION]: ['Động Thiên Cung', 'Núi Bài Thơ'],

@@ -11,7 +11,7 @@ def create_database_and_tables():
     connection = mysql.connector.connect(
         host=os.getenv("MYSQL_HOST", "localhost"),
         user=os.getenv("MYSQL_USER", "root"),
-        password=os.getenv("MYSQL_PASSWORD", "123456"),
+        password=os.getenv("MYSQL_PASSWORD", ""),
         port=int(os.getenv("MYSQL_PORT", 3306)),
         charset='utf8mb4'
     )
@@ -63,27 +63,7 @@ def create_database_and_tables():
         cursor.execute(create_messages_table)
         print("Table 'messages' created or already exists")
         
-        # Tạo bảng chat_history (để tương thích với code cũ nếu cần)
-        create_chat_history_table = """
-        CREATE TABLE IF NOT EXISTS chat_history (
-            id VARCHAR(36) PRIMARY KEY,
-            user_id VARCHAR(36) NOT NULL,
-            conversation_id VARCHAR(36),
-            user_message TEXT NOT NULL,
-            bot_response TEXT NOT NULL,
-            language VARCHAR(10) DEFAULT 'vi',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_user_id (user_id),
-            INDEX idx_conversation_id (conversation_id),
-            INDEX idx_created_at (created_at),
-            INDEX idx_user_created (user_id, created_at),
-            FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        """
-        
-        cursor.execute(create_chat_history_table)
-        print("Table 'chat_history' created or already exists")
-        
+       
         # Tạo bảng locations (địa điểm du lịch)
         create_locations_table = """
         CREATE TABLE IF NOT EXISTS locations (

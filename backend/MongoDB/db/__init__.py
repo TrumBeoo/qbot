@@ -19,9 +19,4 @@ db = mongo_db  # Export db object for other modules
 users_collection = mongo_db["users"]
 admin_user_collection = mongo_db["admins"]
 data_collection = mongo_db["data"]
-
-# Chat-related collections moved to MySQL
-#chat_collection = mongo_db["chat_history"]  
-#messages_collection = mongo_db["messages"]  # Now in MySQL
-#dashboard_users_collection = mongo_db["dashboard_users"]
-#dashboard_data_collection = mongo_db["dashboard_data"]
+chat_collection = mongo_db["chat_history"]  

@@ -75,13 +75,20 @@ class AuthService:
         user.set_password(password)
         
         # Save to database
-        created_user = UserRepository.create_user(user.to_db_dict())
+        user_id = UserRepository.create_user(user.to_db_dict())
+        
+        # Get created user data
+        created_user_data = UserRepository.find_by_id(user_id)
         
         # Generate token
-        token = cls.generate_jwt_token(created_user._id)
+        token = cls.generate_jwt_token(user_id)
+        
+        # Convert user_data to proper format
+        user_dict = dict(created_user_data)
+        user_dict['_id'] = str(user_dict['_id'])  # Convert ObjectId to string
         
         return {
-            'user': created_user.to_dict(),
+            'user': user_dict,
             'token': token
         }
     
@@ -96,30 +103,38 @@ class AuthService:
         email = email.strip().lower()
         
         # Find user
-        user = UserRepository.find_by_email(email)
-        if not user:
+        user_data = UserRepository.find_by_email(email)
+        if not user_data:
             raise ValueError('Invalid email or password')
         
+        # Create User object for password checking
+        user = User(user_data)
+        
         # Check if user registered with social login
-        if user.provider != 'email':
-            raise ValueError(f'This account was created using {user.provider.title()} login. Please use {user.provider.title()} to sign in.')
+        if user_data.get('provider') != 'email':
+            provider = user_data.get('provider', 'social')
+            raise ValueError(f'This account was created using {provider.title()} login. Please use {provider.title()} to sign in.')
         
         # Check password
         if not user.check_password(password):
             raise ValueError('Invalid email or password')
         
         # Check if user is active
-        if not user.is_active:
+        if not user_data.get('is_active', True):
             raise ValueError('Account is deactivated')
         
         # Update last login
-        UserRepository.update_last_login(user._id)
+        UserRepository.update_last_login(user_data['_id'])
         
         # Generate token
-        token = cls.generate_jwt_token(user._id)
+        token = cls.generate_jwt_token(user_data['_id'])
+        
+        # Convert user_data to proper format
+        user_dict = dict(user_data)
+        user_dict['_id'] = str(user_dict['_id'])  # Convert ObjectId to string
         
         return {
-            'user': user.to_dict(),
+            'user': user_dict,
             'token': token
         }
     
@@ -155,22 +170,23 @@ class AuthService:
                 raise ValueError('Invalid Google user data')
             
             # Check if user exists
-            user = UserRepository.find_by_email(email)
+            user_data = UserRepository.find_by_email(email)
             
-            if user:
+            if user_data:
                 # Update existing user
                 update_data = {
                     'google_id': google_id,
                     'profile_picture': profile_picture,
                     'last_login': datetime.utcnow()
                 }
-                UserRepository.update_user(user._id, update_data)
+                UserRepository.update_user(user_data['_id'], update_data)
                 
                 # Refresh user data
-                user = UserRepository.find_by_id(user._id)
+                user_data = UserRepository.find_by_id(user_data['_id'])
+                user_id = user_data['_id']
             else:
                 # Create new user
-                user_data = {
+                new_user_data = {
                     'email': email,
                     'name': name,
                     'google_id': google_id,
@@ -187,13 +203,18 @@ class AuthService:
                     }
                 }
                 
-                user = UserRepository.create_user(user_data)
+                user_id = UserRepository.create_user(new_user_data)
+                user_data = UserRepository.find_by_id(user_id)
             
             # Generate token
-            token = cls.generate_jwt_token(user._id)
+            token = cls.generate_jwt_token(user_id)
+            
+            # Convert user_data to proper format
+            user_dict = dict(user_data)
+            user_dict['_id'] = str(user_dict['_id'])  # Convert ObjectId to string
             
             return {
-                'user': user.to_dict(),
+                'user': user_dict,
                 'token': token
             }
             
@@ -241,22 +262,23 @@ class AuthService:
                 raise ValueError('Invalid Facebook user data')
             
             # Check if user exists
-            user = UserRepository.find_by_email(email)
+            user_data = UserRepository.find_by_email(email)
             
-            if user:
+            if user_data:
                 # Update existing user
                 update_data = {
                     'facebook_id': facebook_id,
                     'profile_picture': profile_picture,
                     'last_login': datetime.utcnow()
                 }
-                UserRepository.update_user(user._id, update_data)
+                UserRepository.update_user(user_data['_id'], update_data)
                 
                 # Refresh user data
-                user = UserRepository.find_by_id(user._id)
+                user_data = UserRepository.find_by_id(user_data['_id'])
+                user_id = user_data['_id']
             else:
                 # Create new user
-                user_data = {
+                new_user_data = {
                     'email': email,
                     'name': name,
                     'facebook_id': facebook_id,
@@ -273,13 +295,18 @@ class AuthService:
                     }
                 }
                 
-                user = UserRepository.create_user(user_data)
+                user_id = UserRepository.create_user(new_user_data)
+                user_data = UserRepository.find_by_id(user_id)
             
             # Generate token
-            token = cls.generate_jwt_token(user._id)
+            token = cls.generate_jwt_token(user_id)
+            
+            # Convert user_data to proper format
+            user_dict = dict(user_data)
+            user_dict['_id'] = str(user_dict['_id'])  # Convert ObjectId to string
             
             return {
-                'user': user.to_dict(),
+                'user': user_dict,
                 'token': token
             }
             
@@ -290,15 +317,20 @@ class AuthService:
     def get_user_by_token(cls, token):
         """Get user by JWT token"""
         user_id = cls.verify_jwt_token(token)
-        user = UserRepository.find_by_id(user_id)
+        user_data = UserRepository.find_by_id(user_id)
         
-        if not user:
+        if not user_data:
             raise ValueError('User not found')
         
-        if not user.is_active:
+        if not user_data.get('is_active', True):
             raise ValueError('Account is deactivated')
         
-        return user
+        # Convert to proper format
+        user_dict = dict(user_data)
+        user_dict['_id'] = str(user_dict['_id'])  # Convert ObjectId to string
+        user_dict['id'] = str(user_dict['_id'])  # Add id field for compatibility
+        
+        return user_dict
     
     @classmethod
     def update_user_profile(cls, user_id, profile_data):

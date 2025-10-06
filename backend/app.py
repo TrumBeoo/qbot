@@ -5,7 +5,7 @@ import base64
 import os
 from RAG.rag_engine import ask_question
 from config.noi import detect_language, get_ai_response, synthesize_speech_to_bytes
-from services.location_image_service import location_image_service
+from services.simple_image_service import simple_image_service
 
 from auth.auth import auth_bp, token_required
 from services.mysql_chat_service import MySQLChatService
@@ -21,23 +21,18 @@ CORS(app,
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
 
-# Initialize location image service
-location_service = location_image_service
-
 def get_response_with_images(message, lang):
-    """Get chatbot response with location images if applicable"""
-    # Get text response
+    """Get chatbot response with images if applicable"""
+    
+    # Use RAG for all queries
     response_text = ask_question(message, lang)
     
-    # Extract location keywords and get images
-    location_keywords = location_service.extract_location_keywords(message)
-    images = []
-    
-    if location_keywords:
-        images = location_service.get_images_by_location(location_keywords, limit=4)
-        print(f"Found {len(images)} images for keywords: {location_keywords}")
+    # Get images based on locations mentioned in bot response
+    images = simple_image_service.get_images_for_response(response_text)
     
     return response_text, images
+
+
 
 # Set JWT secret key
 app.config['JWT_SECRET'] = os.getenv('JWT_SECRET', 'your-secret-k ey-change-this-in-production')
@@ -62,9 +57,15 @@ except Exception as e:
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
-# Register MySQL chat blueprint
+# Register MongoDB chat blueprint (primary)
+from MongoDB.db.routes import mongodb_bp
+app.register_blueprint(mongodb_bp, url_prefix='/api/chat')
+
+# Register MySQL chat blueprint (legacy)
 from repositories.mysql_chat_blueprint import mysql_chat_bp
-app.register_blueprint(mysql_chat_bp, url_prefix='/api/chat')
+app.register_blueprint(mysql_chat_bp, url_prefix='/api/mysql-chat')
+
+# Google Maps functionality removed - using enhanced image service only
 
 
 
@@ -90,6 +91,23 @@ def get_current_datetime():
         'time': now.strftime('%H:%M:%S'),
         'full': now.strftime('%A, %d %B %Y, %H:%M:%S')
     }
+
+def generate_conversation_title(message: str) -> str:
+    """Generate a meaningful title for conversation based on first message"""
+    # Truncate long messages
+    if len(message) > 50:
+        title = message[:47] + "..."
+    else:
+        title = message
+    
+    # Clean up the title
+    title = title.strip()
+    if not title:
+        title = "New Conversation"
+    
+    return title
+
+
 
 @app.route('/datetime', methods=['GET'])
 def get_datetime():
@@ -133,15 +151,15 @@ def chat():
 
 @app.route('/chat-authenticated', methods=['POST'])
 @token_required
-def chat_authenticated(current_user_id):
-    """Authenticated chat endpoint that saves to history"""
+def chat_authenticated(current_user):
+    """Authenticated chat endpoint using MongoDB for RAG context and MySQL for conversation storage"""
     try:
         data = request.get_json(force=True)
         message = (data or {}).get('message', '').strip()
         lang = (data or {}).get('language')
         conversation_id = (data or {}).get('conversation_id')
         
-        print(f"🔍 Received authenticated request: message='{message}', lang='{lang}', conversation_id='{conversation_id}'")
+        print(f"🔍 Hybrid chat request: message='{message[:50]}...', lang='{lang}', conv_id='{conversation_id}'")
         
         if not message:
             return jsonify({'status': 'error', 'message': 'Missing message'}), 400
@@ -155,35 +173,92 @@ def chat_authenticated(current_user_id):
             datetime_info = get_current_datetime()
             response_text = get_ai_response(f"{message}. Hiện tại là {datetime_info['datetime']}", lang)
             images = []
-        else:
-            # Use RAG for tourism queries with language support and get images
-            response_text, images = get_response_with_images(message, lang)
-        
-        # Save to chat history if conversation_id is provided
-        if conversation_id:
+            
+            # Save to MySQL
+            mysql_conversation_id = conversation_id
             try:
-                print(f"💾 Saving to MySQL conversation {conversation_id}: user='{message}', bot='{response_text[:50]}...'")
-                result = MySQLChatService.add_message_to_conversation(
-                    conversation_id, 
-                    current_user_id, 
-                    message, 
-                    response_text, 
-                    lang
-                )
-                print(f"✅ Messages saved successfully to MySQL: {len(result)} messages")
-            except Exception as e:
-                print(f"❌ Error saving to MySQL chat history: {str(e)}")
-                import traceback
-                traceback.print_exc()
-                # Continue even if saving fails
+                if not mysql_conversation_id:
+                    # Create new conversation with first message pair
+                    result_data = MySQLChatService.create_conversation_with_message(
+                        current_user['id'], 
+                        message, 
+                        response_text, 
+                        lang
+                    )
+                    mysql_conversation_id = result_data['conversation']['id']
+                    print(f"✅ Created new MySQL conversation for time/date: {mysql_conversation_id}")
+                else:
+                    # Add messages to existing conversation
+                    MySQLChatService.add_message_to_conversation(
+                        mysql_conversation_id, current_user['id'], message, response_text, lang
+                    )
+                    print(f"✅ Saved time/date conversation to existing MySQL: {mysql_conversation_id}")
+            except Exception as save_error:
+                print(f"⚠️ Failed to save time/date conversation to MySQL: {save_error}")
+                mysql_conversation_id = conversation_id
+            
+            return jsonify({
+                'status': 'success', 
+                'response': response_text, 
+                'language': lang,
+                'images': images,
+                'conversation_id': mysql_conversation_id
+            })
         
-        return jsonify({
-            'status': 'success', 
-            'response': response_text, 
-            'language': lang,
-            'images': images
-        })
+        # Use MongoDB RAG service for contextual chat (for AI response generation)
+        from services.mongodb_rag_service import mongodb_rag_service
+        
+        result = mongodb_rag_service.chat_with_context(
+            current_user['id'], message, conversation_id, lang
+        )
+        
+        if result["success"]:
+            # Get images based on locations mentioned in bot response
+            images = simple_image_service.get_images_for_response(result["response"])
+            
+            # Save conversation and messages to MySQL
+            mysql_conversation_id = conversation_id
+            try:
+                if not mysql_conversation_id:
+                    # Create new conversation with first message pair
+                    result_data = MySQLChatService.create_conversation_with_message(
+                        current_user['id'], 
+                        message, 
+                        result["response"], 
+                        result["language"]
+                    )
+                    mysql_conversation_id = result_data['conversation']['id']
+                    print(f"✅ Created new MySQL conversation: {mysql_conversation_id} with title: '{result_data['conversation']['title']}'")
+                else:
+                    # Add messages to existing conversation
+                    saved_messages = MySQLChatService.add_message_to_conversation(
+                        mysql_conversation_id, current_user['id'], message, result["response"], result["language"]
+                    )
+                    print(f"✅ Saved {len(saved_messages)} messages to existing MySQL conversation: {mysql_conversation_id}")
+                
+            except Exception as mysql_error:
+                print(f"⚠️ MySQL conversation error: {mysql_error}")
+                # Continue without breaking the chat experience
+                mysql_conversation_id = conversation_id
+            
+            return jsonify({
+                'status': 'success',
+                'response': result["response"],
+                'language': result["language"],
+                'images': images,
+                'conversation_id': mysql_conversation_id,  # Return MySQL conversation ID
+                'metadata': result["metadata"]
+            })
+        else:
+            return jsonify({
+                'status': 'error', 
+                'message': result["error"]
+            }), 500
+            
     except Exception as e:
+        print(f"❌ Hybrid chat error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/voice-chat', methods=['POST'])
@@ -253,8 +328,8 @@ def voice_welcome():
 
 @app.route('/voice-chat-authenticated', methods=['POST'])
 @token_required
-def voice_chat_authenticated(current_user_id):
-    """Authenticated voice chat endpoint that saves to history"""
+def voice_chat_authenticated(current_user):
+    """Authenticated voice chat endpoint using MongoDB for RAG context and MySQL for conversation storage"""
     try:
         data = request.get_json(force=True)
         text = (data or {}).get('text', '').strip()
@@ -266,49 +341,89 @@ def voice_chat_authenticated(current_user_id):
         
         # Always detect language from the actual text
         detected_lang = detect_language(text)
-        print(f"Authenticated Voice Chat - Input: '{text}' | Detected: {detected_lang} | Hint: {lang}")
+        print(f"🎤 Hybrid voice chat - Input: '{text[:50]}...' | Detected: {detected_lang}")
         
         # Check if user is asking about time/date
         time_keywords = ['giờ', 'ngày', 'tháng', 'năm', 'time', 'date', 'today', 'now', 'hôm nay', 'bây giờ']
         if any(keyword in text.lower() for keyword in time_keywords):
             datetime_info = get_current_datetime()
             response_text = get_ai_response(f"{text}. Hiện tại là {datetime_info['datetime']}", detected_lang)
+            
+            # Save to MySQL if we have conversation_id
+            if conversation_id:
+                try:
+                    MySQLChatService.add_message_to_conversation(
+                        conversation_id, current_user['id'], text, response_text, detected_lang
+                    )
+                    print(f"✅ Saved voice time/date conversation to MySQL: {conversation_id}")
+                except Exception as save_error:
+                    print(f"⚠️ Failed to save voice time/date conversation to MySQL: {save_error}")
         else:
-            # Use RAG for tourism queries with language support (same as chat endpoint)
-            response_text = ask_question(text, detected_lang)
+            # Use MongoDB RAG service for contextual voice chat (for AI response generation)
+            from services.mongodb_rag_service import mongodb_rag_service
+            
+            result = mongodb_rag_service.voice_chat_with_context(
+                current_user['id'], text, conversation_id, detected_lang
+            )
+            
+            if not result["success"]:
+                return jsonify({
+                    'status': 'error', 
+                    'message': result["error"]
+                }), 500
+            
+            response_text = result["response"]
+            mongodb_conversation_id = result["conversation_id"]
+            
+            # Save conversation and messages to MySQL
+            mysql_conversation_id = conversation_id
+            try:
+                if not mysql_conversation_id:
+                    # Create new conversation in MySQL with a meaningful title
+                    title = generate_conversation_title(text)
+                    conversation = MySQLChatService.create_conversation(
+                        current_user['id'], 
+                        title
+                    )
+                    mysql_conversation_id = conversation['id']
+                    print(f"✅ Created new MySQL voice conversation: {mysql_conversation_id} with title: '{title}'")
+                
+                # Save messages to MySQL
+                saved_messages = MySQLChatService.add_message_to_conversation(
+                    mysql_conversation_id, current_user['id'], text, response_text, detected_lang
+                )
+                print(f"✅ Saved {len(saved_messages)} voice messages to MySQL conversation: {mysql_conversation_id}")
+                
+            except Exception as mysql_error:
+                print(f"⚠️ MySQL voice conversation error: {mysql_error}")
+                # Continue without breaking the chat experience
+                mysql_conversation_id = conversation_id or mongodb_conversation_id
+            
+            conversation_id = mysql_conversation_id  # Use MySQL conversation ID
         
         # Generate audio in the same language as the response
         audio_bytes = synthesize_speech_to_bytes(response_text, detected_lang)
         audio_b64 = base64.b64encode(audio_bytes).decode('utf-8') if audio_bytes else ''
         
-        # Save to chat history if conversation_id is provided
-        if conversation_id:
-            try:
-                MySQLChatService.add_message_to_conversation(
-                    conversation_id, 
-                    current_user_id, 
-                    text, 
-                    response_text, 
-                    detected_lang
-                )
-            except Exception as e:
-                print(f"Error saving to MySQL chat history: {str(e)}")
-        
         return jsonify({
             'status': 'success',
             'response': response_text,
-            'language': detected_lang,  # Return the actually detected language
-            'audio': audio_b64
+            'language': detected_lang,
+            'audio': audio_b64,
+            'conversation_id': conversation_id
         })
+        
     except Exception as e:
-        print(f"Authenticated voice chat error: {str(e)}")
+        print(f"❌ Hybrid voice chat error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 # Dashboard API endpoints for chatbot management
 
 @app.route('/api/dashboard/chatbot-stats', methods=['GET'])
 @token_required
-def get_chatbot_stats(current_user_id):
+def get_chatbot_stats(current_user):
     """Get comprehensive chatbot statistics for dashboard"""
     try:
         from services.chatbot_service import ChatbotService
@@ -322,7 +437,7 @@ def get_chatbot_stats(current_user_id):
 
 @app.route('/api/dashboard/analytics/comprehensive', methods=['GET'])
 @token_required
-def get_comprehensive_analytics(current_user_id):
+def get_comprehensive_analytics(current_user):
     """Get comprehensive analytics data"""
     try:
         from services.analytics_service import AnalyticsService
@@ -336,11 +451,11 @@ def get_comprehensive_analytics(current_user_id):
 
 @app.route('/api/dashboard/analytics/user', methods=['GET'])
 @token_required
-def get_user_analytics(current_user_id):
+def get_user_analytics(current_user):
     """Get analytics data for current user"""
     try:
         from services.analytics_service import AnalyticsService
-        analytics = AnalyticsService.get_user_analytics(current_user_id)
+        analytics = AnalyticsService.get_user_analytics(current_user['id'])
         return jsonify({
             'status': 'success',
             'data': analytics
@@ -350,12 +465,12 @@ def get_user_analytics(current_user_id):
 
 @app.route('/api/dashboard/analytics/insights', methods=['GET'])
 @token_required
-def get_conversation_insights(current_user_id):
+def get_conversation_insights(current_user):
     """Get conversation insights for current user"""
     try:
         from services.analytics_service import AnalyticsService
         # Get user-specific insights
-        user_insights = AnalyticsService.get_conversation_insights(current_user_id)
+        user_insights = AnalyticsService.get_conversation_insights(current_user['id'])
         # Get system-wide insights for comparison
         system_insights = AnalyticsService.get_conversation_insights()
         
@@ -373,7 +488,7 @@ def get_conversation_insights(current_user_id):
 
 @app.route('/api/dashboard/images/upload', methods=['POST'])
 @token_required
-def upload_image(current_user_id):
+def upload_image(current_user):
     """Upload image for chatbot"""
     try:
         if 'image' not in request.files:
@@ -381,14 +496,16 @@ def upload_image(current_user_id):
         
         file = request.files['image']
         location_id = request.form.get('location_id')
+        location_name = request.form.get('location_name')
         image_type = request.form.get('image_type', 'gallery')
         caption = request.form.get('caption', '')
+        category = request.form.get('category', '')
         
         if file.filename == '':
             return jsonify({'status': 'error', 'message': 'No file selected'}), 400
         
-        if not location_id:
-            return jsonify({'status': 'error', 'message': 'Location ID required'}), 400
+        if not location_id and not location_name:
+            return jsonify({'status': 'error', 'message': 'Location ID or name required'}), 400
         
         # Validate file type
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -409,125 +526,220 @@ def upload_image(current_user_id):
         file.save(file_path)
         
         # Save to database
-        image_url = f"/static/images/uploads/{unique_filename}"
-        success = location_service.add_location_image(
-            location_id=int(location_id),
-            image_url=image_url,
-            image_type=image_type,
-            caption=caption
-        )
+        import mysql.connector
+        db_config = {
+            'host': os.getenv("MYSQL_HOST", "localhost"),
+            'user': os.getenv("MYSQL_USER", "root"),
+            'password': os.getenv("MYSQL_PASSWORD", "123456"),
+            'port': int(os.getenv("MYSQL_PORT", 3306)),
+            'database': os.getenv("MYSQL_DATABASE", "chatbot"),
+            'charset': 'utf8mb4'
+        }
         
-        if success:
+        connection = mysql.connector.connect(**db_config)
+        cursor = connection.cursor(dictionary=True)
+        
+        try:
+            # Handle location creation or selection
+            if not location_id and location_name:
+                # Check if location exists
+                cursor.execute("SELECT id FROM locations WHERE name = %s", (location_name,))
+                existing_location = cursor.fetchone()
+                
+                if existing_location:
+                    location_id = existing_location['id']
+                else:
+                    # Create new location
+                    cursor.execute(
+                        "INSERT INTO locations (name, category) VALUES (%s, %s)",
+                        (location_name, category or 'attraction')
+                    )
+                    location_id = cursor.lastrowid
+            
+            # Save image to database
+            image_url = f"/static/images/uploads/{unique_filename}"
+            cursor.execute(
+                "INSERT INTO location_images (location_id, image_url, image_type, caption) VALUES (%s, %s, %s, %s)",
+                (location_id, image_url, image_type, caption)
+            )
+            
+            connection.commit()
+            
             return jsonify({
                 'status': 'success',
                 'message': 'Image uploaded successfully',
-                'image_url': f"http://localhost:5000{image_url}"
+                'image_url': f"http://localhost:5000{image_url}",
+                'location_name': location_name or f'Location {location_id}'
             })
-        else:
-            # Remove file if database save failed
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            return jsonify({'status': 'error', 'message': 'Failed to save image to database'}), 500
+            
+        finally:
+            cursor.close()
+            connection.close()
         
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/dashboard/locations', methods=['GET'])
 @token_required
-def get_locations(current_user_id):
+def get_locations(current_user):
     """Get all locations for dropdown"""
     try:
-        connection = location_service.get_connection()
+        import mysql.connector
+        db_config = {
+            'host': os.getenv("MYSQL_HOST", "localhost"),
+            'user': os.getenv("MYSQL_USER", "root"),
+            'password': os.getenv("MYSQL_PASSWORD", "123456"),
+            'port': int(os.getenv("MYSQL_PORT", 3306)),
+            'database': os.getenv("MYSQL_DATABASE", "chatbot"),
+            'charset': 'utf8mb4'
+        }
+        
+        connection = mysql.connector.connect(**db_config)
         cursor = connection.cursor(dictionary=True)
         
-        cursor.execute("SELECT id, name, name_en, category FROM locations ORDER BY name")
-        locations = cursor.fetchall()
-        
-        cursor.close()
-        connection.close()
-        
-        return jsonify({
-            'status': 'success',
-            'data': locations
-        })
+        try:
+            cursor.execute("SELECT id, name, category FROM locations ORDER BY name")
+            locations = cursor.fetchall()
+            
+            return jsonify({
+                'status': 'success',
+                'data': locations
+            })
+        finally:
+            cursor.close()
+            connection.close()
+            
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/dashboard/images', methods=['GET'])
 @token_required
-def get_all_images(current_user_id):
+def get_all_images(current_user):
     """Get all uploaded images with location info"""
     try:
-        connection = location_service.get_connection()
+        import mysql.connector
+        db_config = {
+            'host': os.getenv("MYSQL_HOST", "localhost"),
+            'user': os.getenv("MYSQL_USER", "root"),
+            'password': os.getenv("MYSQL_PASSWORD", "123456"),
+            'port': int(os.getenv("MYSQL_PORT", 3306)),
+            'database': os.getenv("MYSQL_DATABASE", "chatbot"),
+            'charset': 'utf8mb4'
+        }
+        
+        connection = mysql.connector.connect(**db_config)
         cursor = connection.cursor(dictionary=True)
         
-        query = """
-        SELECT 
-            li.id,
-            li.image_url,
-            li.image_type,
-            li.caption,
-            li.display_order,
-            li.is_active,
-            li.created_at,
-            l.name as location_name,
-            l.category
-        FROM location_images li
-        JOIN locations l ON li.location_id = l.id
-        ORDER BY li.created_at DESC
-        """
-        
-        cursor.execute(query)
-        images = cursor.fetchall()
-        
-        # Format image URLs
-        for image in images:
-            if image['image_url'].startswith('/static/'):
-                image['full_url'] = f"http://localhost:5000{image['image_url']}"
-            else:
-                image['full_url'] = image['image_url']
-        
-        cursor.close()
-        connection.close()
-        
-        return jsonify({
-            'status': 'success',
-            'data': images
-        })
+        try:
+            query = """
+            SELECT 
+                li.id,
+                li.image_url,
+                li.image_type,
+                li.caption,
+                li.display_order,
+                li.is_active,
+                li.created_at,
+                l.name as location_name,
+                l.category
+            FROM location_images li
+            JOIN locations l ON li.location_id = l.id
+            ORDER BY li.created_at DESC
+            """
+            
+            cursor.execute(query)
+            results = cursor.fetchall()
+            
+            images = []
+            for row in results:
+                image_url = row['image_url']
+                if image_url.startswith('/static/'):
+                    full_url = f"http://localhost:5000{image_url}"
+                else:
+                    full_url = image_url
+                
+                images.append({
+                    'id': row['id'],
+                    'image_url': image_url,
+                    'full_url': full_url,
+                    'image_type': row['image_type'],
+                    'caption': row['caption'] or '',
+                    'location_name': row['location_name'],
+                    'category': row['category'],
+                    'display_order': row['display_order'],
+                    'is_active': row['is_active'],
+                    'created_at': row['created_at'].isoformat() if row['created_at'] else None
+                })
+            
+            return jsonify({
+                'status': 'success',
+                'data': images
+            })
+        finally:
+            cursor.close()
+            connection.close()
+            
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/dashboard/images/<int:image_id>', methods=['DELETE'])
 @token_required
-def delete_image(current_user_id, image_id):
+def delete_image(current_user, image_id):
     """Delete an image"""
     try:
-        connection = location_service.get_connection()
+        import mysql.connector
+        db_config = {
+            'host': os.getenv("MYSQL_HOST", "localhost"),
+            'user': os.getenv("MYSQL_USER", "root"),
+            'password': os.getenv("MYSQL_PASSWORD", "123456"),
+            'port': int(os.getenv("MYSQL_PORT", 3306)),
+            'database': os.getenv("MYSQL_DATABASE", "chatbot"),
+            'charset': 'utf8mb4'
+        }
+        
+        connection = mysql.connector.connect(**db_config)
         cursor = connection.cursor(dictionary=True)
         
-        # Get image info first
-        cursor.execute("SELECT image_url FROM location_images WHERE id = %s", (image_id,))
-        image = cursor.fetchone()
-        
-        if not image:
-            return jsonify({'status': 'error', 'message': 'Image not found'}), 404
-        
-        # Delete from database
-        cursor.execute("DELETE FROM location_images WHERE id = %s", (image_id,))
-        connection.commit()
-        
-        # Delete file if it's a local upload
-        if image['image_url'].startswith('/static/images/uploads/'):
-            file_path = image['image_url'][1:]  # Remove leading slash
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        
-        cursor.close()
-        connection.close()
-        
+        try:
+            # Get image info first
+            cursor.execute("SELECT image_url FROM location_images WHERE id = %s", (image_id,))
+            image = cursor.fetchone()
+            
+            if not image:
+                return jsonify({'status': 'error', 'message': 'Image not found'}), 404
+            
+            # Delete from database
+            cursor.execute("DELETE FROM location_images WHERE id = %s", (image_id,))
+            
+            # Delete physical file
+            if image['image_url'].startswith('/static/'):
+                file_path = os.path.join(os.getcwd(), image['image_url'][1:])  # Remove leading slash
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            
+            connection.commit()
+            
+            return jsonify({
+                'status': 'success',
+                'message': 'Image deleted successfully'
+            })
+        finally:
+            cursor.close()
+            connection.close()
+            
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/test-images', methods=['GET'])
+def test_images():
+    """Test endpoint to check image service"""
+    try:
+        test_response = "Vịnh Hạ Long là một trong những di sản thiên nhiên thế giới"
+        images = simple_image_service.get_images_for_response(test_response)
         return jsonify({
             'status': 'success',
-            'message': 'Image deleted successfully'
+            'test_response': test_response,
+            'images': images
         })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -536,7 +748,7 @@ def delete_image(current_user_id, image_id):
 
 @app.route('/api/dashboard/mongodb/sync-status', methods=['GET'])
 @token_required
-def get_mongodb_sync_status(current_user_id):
+def get_mongodb_sync_status(current_user):
     """Get MongoDB synchronization status"""
     try:
         from services.mongodb_data_service import MongoDBDataService
@@ -550,7 +762,7 @@ def get_mongodb_sync_status(current_user_id):
 
 @app.route('/api/dashboard/mongodb/sync-all', methods=['POST'])
 @token_required
-def sync_all_to_mongodb(current_user_id):
+def sync_all_to_mongodb(current_user):
     """Sync all data files to MongoDB"""
     try:
         from services.mongodb_data_service import MongoDBDataService
@@ -616,6 +828,80 @@ def get_mongodb_file(current_user_id, filename):
         return jsonify({
             'status': 'success',
             'data': result
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# Places management endpoints
+
+@app.route('/api/dashboard/places', methods=['GET'])
+@token_required
+def get_places(current_user):
+    """Get all places for dashboard"""
+    try:
+        return jsonify({
+            'status': 'success',
+            'data': []
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/places', methods=['POST'])
+@token_required
+def add_place(current_user):
+    """Add new place"""
+    try:
+        return jsonify({
+            'status': 'error',
+            'message': 'Place management not available'
+        }), 501
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/places/<int:place_id>', methods=['PUT'])
+@token_required
+def update_place(current_user, place_id):
+    """Update existing place"""
+    try:
+        return jsonify({
+            'status': 'error',
+            'message': 'Place management not available'
+        }), 501
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/places/<int:place_id>', methods=['DELETE'])
+@token_required
+def delete_place(current_user, place_id):
+    """Delete place"""
+    try:
+        return jsonify({
+            'status': 'error',
+            'message': 'Place management not available'
+        }), 501
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/places/<int:place_id>', methods=['GET'])
+@token_required
+def get_place_details(current_user, place_id):
+    """Get place details"""
+    try:
+        return jsonify({
+            'status': 'error',
+            'message': 'Place not found'
+        }), 404
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/dashboard/places/search', methods=['POST'])
+@token_required
+def search_places_dashboard(current_user):
+    """Search places for dashboard"""
+    try:
+        return jsonify({
+            'status': 'success',
+            'data': []
         })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500

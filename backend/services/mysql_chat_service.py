@@ -13,6 +13,93 @@ class MySQLChatService:
         return conversation.to_dict(include_messages=False)
     
     @classmethod
+    def create_conversation_with_message(cls, user_id, user_message, bot_response=None, language='vi'):
+        """Create a new conversation and add the first message pair"""
+        if not user_message.strip():
+            raise ValueError('User message cannot be empty')
+        
+        # Generate title from first message
+        title = cls._generate_conversation_title(user_message)
+        
+        # Create conversation
+        conversation = MySQLChatRepository.create_conversation(user_id, title)
+        
+        # Add messages
+        messages = []
+        timestamp = datetime.utcnow()
+        
+        # User message
+        user_msg = MySQLMessage(user_message.strip(), 'user', language, timestamp, conversation.id)
+        messages.append(user_msg)
+        
+        # Bot response (if provided)
+        if bot_response and bot_response.strip():
+            bot_msg = MySQLMessage(bot_response.strip(), 'bot', language, timestamp, conversation.id)
+            messages.append(bot_msg)
+        
+        # Add messages to conversation
+        success = MySQLChatRepository.add_messages_to_conversation(
+            conversation.id, 
+            user_id, 
+            messages
+        )
+        
+        if not success:
+            raise ValueError('Failed to add messages to new conversation')
+        
+        print(f"💾 Created conversation '{title}' with {len(messages)} messages")
+        return {
+            'conversation': conversation.to_dict(include_messages=False),
+            'messages': [msg.to_dict() for msg in messages]
+        }
+    
+    @classmethod
+    def _generate_conversation_title(cls, message):
+        """Generate a meaningful title for conversation based on first message"""
+        if not message or not message.strip():
+            return "New Conversation"
+        
+        # Clean the message
+        clean_message = message.strip()
+        
+        # If message is too short, use it as is
+        if len(clean_message) <= 30:
+            return clean_message
+        
+        # Try to extract key topics or locations
+        import re
+        
+        # Look for location names (capitalized words)
+        locations = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', clean_message)
+        if locations:
+            location = locations[0]
+            if len(location) <= 25:
+                return f"About {location}"
+        
+        # Look for question words to create descriptive titles
+        question_patterns = {
+            r'\b(?:where|nơi nào|ở đâu)\b': 'Location Question',
+            r'\b(?:how|làm sao|như thế nào)\b': 'How-to Question', 
+            r'\b(?:what|gì|cái gì)\b': 'Information Request',
+            r'\b(?:when|khi nào|lúc nào)\b': 'Time Question',
+            r'\b(?:why|tại sao|vì sao)\b': 'Explanation Request',
+            r'\b(?:hotel|khách sạn)\b': 'Hotel Inquiry',
+            r'\b(?:restaurant|nhà hàng|ăn)\b': 'Food & Dining',
+            r'\b(?:travel|du lịch|trip)\b': 'Travel Planning',
+            r'\b(?:price|giá|cost|chi phí)\b': 'Price Inquiry'
+        }
+        
+        for pattern, title_type in question_patterns.items():
+            if re.search(pattern, clean_message, re.IGNORECASE):
+                return title_type
+        
+        # Fallback: use first 30 characters with ellipsis
+        if len(clean_message) > 30:
+            return clean_message[:27] + "..."
+        
+        return clean_message
+    
+    @classmethod
     def get_user_conversations(cls, user_id, limit=50, skip=0):
         """Get all conversations for a user"""
         conversations = MySQLChatRepository.find_conversations_by_user(user_id, limit, skip)
@@ -50,6 +137,11 @@ class MySQLChatService:
         if not user_message.strip():
             raise ValueError('User message cannot be empty')
         
+        # Verify conversation exists and belongs to user
+        existing_conversation = MySQLChatRepository.find_conversation_by_id(conversation_id, user_id)
+        if not existing_conversation:
+            raise ValueError(f'Conversation {conversation_id} not found or does not belong to user {user_id}')
+        
         # Create messages
         messages = []
         timestamp = datetime.utcnow()
@@ -73,6 +165,7 @@ class MySQLChatService:
         if not success:
             raise ValueError('Failed to add message to conversation')
         
+        print(f"💾 Successfully added {len(messages)} messages to conversation {conversation_id}")
         return [msg.to_dict() for msg in messages]
     
     @classmethod
@@ -171,16 +264,3 @@ class MySQLChatService:
             'average_messages_per_conversation': round(avg_messages, 2)
         }
     
-    # Legacy support methods
-    @classmethod
-    def save_chat_history(cls, user_id, user_message, bot_response, language='vi', conversation_id=None):
-        """Save to chat_history table (legacy support)"""
-        return MySQLChatRepository.save_chat_history(
-            user_id, user_message, bot_response, language, conversation_id
-        )
-    
-    @classmethod
-    def get_chat_history(cls, user_id, limit=50, skip=0):
-        """Get chat history for user (legacy support)"""
-        history = MySQLChatRepository.get_chat_history(user_id, limit, skip)
-        return [chat.to_dict() for chat in history]

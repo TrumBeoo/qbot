@@ -68,7 +68,7 @@ class VoiceApiService {
      
      // Only include language hint if we have one (let backend do primary detection)
      if (detectedHint) {
-       body.language_hint = detectedHint;
+       body.language = detectedHint;
      }
      
      if (conversationId && isAuth) {

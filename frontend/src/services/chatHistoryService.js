@@ -52,7 +52,7 @@ class ChatHistoryService {
       return {
         success: true,
         conversation: data.data,
-        conversationId: data.data?.id,
+        conversationId: data.data?.conversation_id || data.data?.id,
         message: data.message
       };
     } catch (error) {

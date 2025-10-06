@@ -1,69 +1,13 @@
 import { useState, useCallback, useMemo } from 'react';
 import { generateServiceQuery, requiresSpecialHandling } from '../utils/serviceUtils';
 
-export const useServiceToolbar = ({ onServiceSelect, onMapClick, onRouteClick, onLocationClick, onDirectionClick, onAdvancedMapClick }) => {
+export const useServiceToolbar = ({ onServiceSelect }) => {
   const [showServiceToolbar, setShowServiceToolbar] = useState(false);
   const [activeService, setActiveService] = useState(null);
 
   // Memoize service configurations
   const serviceConfigs = useMemo(() => ({
-    // Core map services
-    map: {
-      icon: 'FaMap',
-      label: 'Bản đồ',
-      color: 'blue',
-      description: 'Xem bản đồ du lịch Quảng Ninh',
-      category: 'navigation',
-      handler: onMapClick,
-      suggestions: [
-        'Vịnh Hạ Long',
-        'Đảo Cát Bà', 
-        'Yên Tử',
-        'Chùa Ba Vàng'
-      ]
-    },
-    route: {
-      icon: 'FaRoute',
-      label: 'Tìm đường',
-      color: 'green',
-      description: 'Tìm đường đi tối ưu',
-      category: 'navigation',
-      handler: onRouteClick,
-      suggestions: [
-        'Từ Hà Nội đến Hạ Long',
-        'Từ sân bay đến trung tâm',
-        'Đường đi Yên Tử',
-        'Lộ trình 1 ngày'
-      ]
-    },
-    location: {
-      icon: 'FaMapMarkerAlt',
-      label: 'Địa điểm',
-      color: 'red',
-      description: 'Khám phá địa điểm gần đây',
-      category: 'navigation',
-      handler: onLocationClick,
-      suggestions: [
-        'Nhà hàng gần đây',
-        'Khách sạn 4 sao',
-        'Điểm tham quan',
-        'Cửa hàng lưu niệm'
-      ]
-    },
-    direction: {
-      icon: 'FaCompass',
-      label: 'Hướng dẫn',
-      color: 'purple',
-      description: 'Hướng dẫn đi lại chi tiết',
-      category: 'navigation',
-      handler: onDirectionClick,
-      suggestions: [
-        'Cách đi bằng xe bus',
-        'Thuê xe máy ở đâu',
-        'Lịch tàu cao tốc',
-        'Bãi đỗ xe gần đây'
-      ]
-    },
+
     // Tourism services
     hotel: {
       icon: 'FaHotel',
@@ -150,7 +94,7 @@ export const useServiceToolbar = ({ onServiceSelect, onMapClick, onRouteClick, o
       category: 'utility',
       suggestions: ['Vé máy bay đi Quảng Ninh']
     }
-  }), [onMapClick, onRouteClick, onLocationClick, onDirectionClick]);
+  }), []);
 
   // Group services by category
   const servicesByCategory = useMemo(() => {

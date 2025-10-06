@@ -1,6 +1,6 @@
 from datetime import datetime
 from MySQL.db import execute_query, execute_many
-from models.mysql_models import MySQLConversation, MySQLMessage, MySQLChatHistory
+from models.mysql_models import MySQLConversation, MySQLMessage
 import uuid
 
 class MySQLChatRepository:
@@ -139,15 +139,21 @@ class MySQLChatRepository:
         VALUES (%s, %s, %s, %s, %s, %s)
         """
         
-        execute_many(insert_query, message_data)
-        
-        # Update conversation timestamp
-        execute_query(
-            "UPDATE conversations SET updated_at = %s WHERE id = %s",
-            [datetime.utcnow(), conversation_id]
-        )
-        
-        return True
+        try:
+            affected_rows = execute_many(insert_query, message_data)
+            print(f"✅ Successfully inserted {affected_rows} messages to conversation {conversation_id}")
+            
+            # Update conversation timestamp
+            execute_query(
+                "UPDATE conversations SET updated_at = %s WHERE id = %s",
+                [datetime.utcnow(), conversation_id]
+            )
+            
+            return True
+        except Exception as e:
+            print(f"❌ Error inserting messages: {e}")
+            print(f"Message data: {message_data}")
+            raise
     
     @staticmethod
     def delete_conversation(conversation_id, user_id):
@@ -257,38 +263,3 @@ class MySQLChatRepository:
         
         return conversations
     
-    # Legacy support methods for chat_history table
-    @staticmethod
-    def save_chat_history(user_id, user_message, bot_response, language='vi', conversation_id=None):
-        """Save to chat_history table (legacy support)"""
-        chat_history = MySQLChatHistory(user_id, user_message, bot_response, language, conversation_id)
-        
-        query = """
-        INSERT INTO chat_history (id, user_id, conversation_id, user_message, bot_response, language, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """
-        
-        execute_query(query, (
-            chat_history.id,
-            chat_history.user_id,
-            chat_history.conversation_id,
-            chat_history.user_message,
-            chat_history.bot_response,
-            chat_history.language,
-            chat_history.created_at
-        ))
-        
-        return chat_history
-    
-    @staticmethod
-    def get_chat_history(user_id, limit=50, skip=0):
-        """Get chat history for user (legacy support)"""
-        query = """
-        SELECT * FROM chat_history 
-        WHERE user_id = %s 
-        ORDER BY created_at DESC 
-        LIMIT %s OFFSET %s
-        """
-        
-        history_data = execute_query(query, [user_id, limit, skip], fetch=True)
-        return [MySQLChatHistory.from_dict(data) for data in history_data]

@@ -121,7 +121,7 @@ Kiểm tra trạng thái server
 - ✅ Copy message functionality
 - ✅ Dashboard quản lý dữ liệu
 - ✅ MongoDB integration cho data storage
-- ✅ MySQL integration cho chat history
+- ✅ MySQL integration cho conversations và messages
 - ✅ File upload và sync với MongoDB
 
 ## 🤖 Chatbot Capabilities

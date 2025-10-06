@@ -417,6 +417,55 @@ class EnhancedRAGService:
         except Exception as e:
             logger.error(f"Error generating follow-up suggestions: {e}")
             return []
+    
+    async def get_response(self, query: str, conversation_history: List[str] = None, 
+                          language: str = 'vi') -> Dict[str, Any]:
+        """
+        Get response for MongoDB chat service (async compatible)
+        
+        Args:
+            query: User's question
+            conversation_history: List of previous messages
+            language: Language for response
+        
+        Returns:
+            Dictionary containing response and metadata
+        """
+        try:
+            # Use regular RAG engine for now
+            response_text = self.rag_engine.ask_question(query, language)
+            
+            # Get source documents for context
+            vectorstore = self.rag_engine._load_vectorstore()
+            docs = vectorstore.similarity_search(query, k=3)
+            
+            sources = []
+            for doc in docs:
+                sources.append({
+                    "content": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content,
+                    "metadata": doc.metadata
+                })
+            
+            return {
+                "response": response_text,
+                "sources": sources,
+                "confidence": 0.8,  # Default confidence
+                "language": language,
+                "context_vector": []  # Could add embedding here if needed
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in get_response: {e}")
+            
+            # Return friendly error message
+            error_msg = self._get_friendly_error_message(language)
+            return {
+                "response": error_msg,
+                "sources": [],
+                "confidence": 0.0,
+                "language": language,
+                "error": str(e)
+            }
 
 
 # Global enhanced RAG service instance

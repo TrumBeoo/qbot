@@ -13,11 +13,11 @@ import {
   MenuItem,
   Text,
 } from '@chakra-ui/react';
-import { FaPaperPlane, FaPlus, FaMap, FaRoute, FaMapMarkerAlt, FaCompass } from 'react-icons/fa';
+import { FaPaperPlane, FaPlus } from 'react-icons/fa';
 import { HiArrowUp } from "react-icons/hi";
 import { useRef, useEffect, useState } from 'react';
 import { translations } from '../../constants';
-import MapSuggestions from '../MapView/MapSuggestions';
+
 import ServiceMenu from './ServiceMenu';
 import { useServiceToolbar } from '../../hooks/useServiceToolbar';
 
@@ -29,16 +29,11 @@ const ChatInput = ({
   language,
   config,
   onVoiceClick,
-  onExtraClick,
-  onMapClick,
-  onRouteClick,
-  onLocationClick,
-  onDirectionClick,
-  onAdvancedMapClick
+
 }) => {
  const inputRef = useRef(null);
  const textareaRef = useRef(null);
- const [showMapSuggestions, setShowMapSuggestions] = useState(false);
+
 
  // Use service toolbar hook
  const {
@@ -53,13 +48,7 @@ const ChatInput = ({
      if (suggestion) {
        setInputText(suggestion);
      }
-     // You can add additional logic here for different service types
-   },
-   onMapClick,
-   onRouteClick,
-   onLocationClick,
-   onDirectionClick,
-   onAdvancedMapClick
+   }
  });
 
   const bgColor = useColorModeValue('#f7f7f8');
@@ -103,14 +92,7 @@ const ChatInput = ({
 
   const canSend = inputText.trim() && !isLoading;
 
-  const handleMapSuggestionClick = (suggestion) => {
-    setInputText(suggestion);
-    setShowMapSuggestions(false);
-  };
 
-  const handleMapMenuClick = () => {
-    setShowMapSuggestions(!showMapSuggestions);
-  };
 
   return (
     <Flex justify="center" px={0} py={5} bg={bgColor}>
@@ -199,13 +181,7 @@ const ChatInput = ({
           </Tooltip>
         </Flex>
 
-        {/* Map Suggestions */}
-        {showMapSuggestions && (
-          <MapSuggestions
-            onSuggestionClick={handleMapSuggestionClick}
-            onClose={() => setShowMapSuggestions(false)}
-          />
-        )}
+
       </Box>
     </Flex>
   );

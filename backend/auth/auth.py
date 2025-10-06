@@ -24,22 +24,22 @@ def token_required(f):
             # Try admin token first
             try:
                 admin = AdminAuthService.get_admin_by_token(token)
-                current_user_id = admin['id']
-                return f(current_user_id, *args, **kwargs)
+                current_user = admin
+                return f(current_user, *args, **kwargs)
             except ValueError:
                 # If admin token fails, try regular user token
                 pass
             
             # Try regular user token
             user = AuthService.get_user_by_token(token)
-            current_user_id = str(user._id)
+            current_user = user
                 
         except ValueError as e:
             return jsonify({'error': str(e)}), 401
         except Exception as e:
             return jsonify({'error': 'Token validation failed'}), 401
         
-        return f(current_user_id, *args, **kwargs)
+        return f(current_user, *args, **kwargs)
     
     return decorated
 
@@ -201,7 +201,7 @@ def verify_token():
         
         return jsonify({
             'valid': True,
-            'user': user.to_dict(),
+            'user': user,
             'user_type': 'user'
         }), 200
         
@@ -220,14 +220,10 @@ def logout():
 @auth_bp.route('/profile', methods=['GET'])
 @cross_origin()
 @token_required
-def get_profile(current_user_id):
+def get_profile(current_user):
     """Get user profile"""
     try:
-        user = UserRepository.find_by_id(current_user_id)
-        if not user:
-            return jsonify({'error': 'User not found'}), 404
-        
-        return jsonify({'user': user.to_dict()}), 200
+        return jsonify({'user': current_user}), 200
         
     except Exception as e:
         print(f"Get profile error: {str(e)}")
@@ -236,7 +232,7 @@ def get_profile(current_user_id):
 @auth_bp.route('/profile', methods=['PUT'])
 @cross_origin()
 @token_required
-def update_profile(current_user_id):
+def update_profile(current_user):
     """Update user profile"""
     try:
         data = request.get_json()
@@ -244,11 +240,16 @@ def update_profile(current_user_id):
         if not data:
             return jsonify({'error': 'No data provided'}), 400
         
-        updated_user = AuthService.update_user_profile(current_user_id, data)
+        updated_user_data = AuthService.update_user_profile(current_user['_id'], data)
+        
+        # Convert to proper format
+        user_dict = dict(updated_user_data)
+        user_dict['_id'] = str(user_dict['_id'])
+        user_dict['id'] = str(user_dict['_id'])
         
         return jsonify({
             'message': 'Profile updated successfully',
-            'user': updated_user.to_dict()
+            'user': user_dict
         }), 200
         
     except ValueError as e:

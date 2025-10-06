@@ -54,7 +54,8 @@ class ApiService {
           success: true,
           message: data.response,
           language: data.language,
-          images: data.images || []
+          images: data.images || [],
+          conversation_id: data.conversation_id
         };
       } else {
         throw new Error(data.message || 'Unknown error occurred');

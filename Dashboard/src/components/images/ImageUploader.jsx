@@ -52,12 +52,13 @@ const ImageUploader = ({ onSuccess }) => {
 
   // Predefined categories for new locations
   const categories = [
-    'Khách sạn',
-    'Nhà hàng',
     'Du lịch',
+    'Khách sạn', 
+    'Nhà hàng',
     'Giải trí',
     'Mua sắm',
     'Dịch vụ',
+    'Thành phố',
     'Khác'
   ];
 
@@ -303,9 +304,23 @@ const ImageUploader = ({ onSuccess }) => {
               <TextField
                 {...params}
                 label="Địa điểm *"
-                placeholder="Chọn từ danh sách hoặc nhập tên mới"
-                helperText={isNewLocation ? "Bạn đang tạo địa điểm mới" : "Chọn từ danh sách có sẵn"}
+                placeholder="VD: Vịnh Hạ Long, Động Thiên Cung, Bãi Cháy..."
+                helperText={
+                  isNewLocation 
+                    ? "Bạn đang tạo địa điểm mới - vui lòng chọn danh mục bên dưới" 
+                    : "Gợi ý: Vịnh Hạ Long, Động Thiên Cung, Động Đầu Gỗ, Bãi Cháy, Tuần Châu, Yên Tử..."
+                }
               />
+            )}
+            renderOption={(props, option) => (
+              <Box component="li" {...props}>
+                <Box>
+                  <Typography variant="body1">{option.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {option.category}
+                  </Typography>
+                </Box>
+              </Box>
             )}
             renderTags={(value, getTagProps) =>
               value.map((option, index) => (

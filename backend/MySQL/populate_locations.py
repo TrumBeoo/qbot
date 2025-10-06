@@ -9,7 +9,7 @@ def get_db_connection():
     return mysql.connector.connect(
         host=os.getenv("MYSQL_HOST", "localhost"),
         user=os.getenv("MYSQL_USER", "root"),
-        password=os.getenv("MYSQL_PASSWORD", "123456"),
+        password=os.getenv("MYSQL_PASSWORD", ""),
         port=int(os.getenv("MYSQL_PORT", 3306)),
         database=os.getenv("MYSQL_DATABASE", "chatbot"),
         charset='utf8mb4'
@@ -99,49 +99,13 @@ def populate_quang_ninh_locations():
             cursor.execute(insert_location, location)
             location_id = cursor.lastrowid
             
-            # Thêm ảnh mẫu cho mỗi địa điểm
-            sample_images = [
-                {
-                    'location_id': location_id,
-                    'image_url': f'/static/images/{location["name"].lower().replace(" ", "_")}_1.jpg',
-                    'image_type': 'main',
-                    'caption': f'Ảnh chính của {location["name"]}',
-                    'caption_en': f'Main photo of {location["name_en"]}',
-                    'display_order': 1
-                },
-                {
-                    'location_id': location_id,
-                    'image_url': f'/static/images/{location["name"].lower().replace(" ", "_")}_2.jpg',
-                    'image_type': 'gallery',
-                    'caption': f'Góc nhìn khác của {location["name"]}',
-                    'caption_en': f'Another view of {location["name_en"]}',
-                    'display_order': 2
-                },
-                {
-                    'location_id': location_id,
-                    'image_url': f'/static/images/{location["name"].lower().replace(" ", "_")}_3.jpg',
-                    'image_type': 'gallery',
-                    'caption': f'Chi tiết {location["name"]}',
-                    'caption_en': f'Details of {location["name_en"]}',
-                    'display_order': 3
-                }
-            ]
-            
-            for image in sample_images:
-                insert_image = """
-                INSERT INTO location_images (location_id, image_url, image_type, caption, caption_en, display_order)
-                VALUES (%(location_id)s, %(image_url)s, %(image_type)s, %(caption)s, %(caption_en)s, %(display_order)s)
-                ON DUPLICATE KEY UPDATE
-                caption = VALUES(caption),
-                caption_en = VALUES(caption_en)
-                """
-                
-                cursor.execute(insert_image, image)
-            
-            print(f"Added location with {len(sample_images)} images")
+            # Images are now managed through the Dashboard
+            # No sample images are created automatically
+            print(f"Added location: {location['name']} (images managed via Dashboard)")
         
         connection.commit()
-        print(f"\nSuccessfully populated {len(locations_data)} locations with images!")
+        print(f"\nSuccessfully populated {len(locations_data)} locations!")
+        print("Images can be added through the Dashboard Image Management interface.")
         
     except mysql.connector.Error as err:
         print(f"Error populating locations: {err}")
