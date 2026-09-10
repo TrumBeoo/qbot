@@ -54,35 +54,47 @@ pip install --index-url https://download.pytorch.org/whl/cpu torch==2.8.0
 pip install -r requirements.txt edge-tts langdetect
 ```
 
-`edge-tts` và `langdetect` bị thiếu trong `requirements.txt` nhưng
-`be/config/noi.py` có import — không cài là crash lúc khởi động.
+`requirements.txt` cần sửa 2 chỗ mới cài được:
 
-Thêm `.venv/` vào `be/.gitignore` (file đó đang là gitignore kiểu Node, chưa
-ignore venv của Python).
+1. **Xoá dòng `langchain-mongodb==0.2.0`.** Nó đòi `numpy<2.0.0` trong khi
+   file lại pin `numpy==2.3.1` → pip báo `ResolutionImpossible`, cài chết
+   giữa đường. Không file `.py` nào trong `be/` import `langchain_mongodb`,
+   đây là dependency chết, xoá là hết conflict.
+2. **Thêm `edge-tts` và `langdetect`.** `be/config/noi.py` import cả hai
+   nhưng requirements không có — không cài là crash lúc khởi động.
 
-Tạo `be/.env`:
+Cài mà không dùng trực tiếp: `googlemaps`, `fuzzywuzzy`, `Pillow` (không
+file nào import). `faiss-cpu` và `sentence-transformers` thì phải giữ —
+langchain gọi chúng gián tiếp qua `FAISS` và `HuggingFaceEmbeddings`.
 
-```env
-# Bắt buộc
-GROQ_API_KEY=gsk_...
+Thêm `.venv/` vào file ignore của `be/` (đang là bản kiểu Node, chưa ignore
+venv Python).
 
-# Chat history (MongoDB là store chính)
-MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/
+## 1b. File .env
 
-# Tuỳ chọn — thiếu thì app vẫn chạy, chỉ in warning
-MYSQL_HOST=localhost
-MYSQL_USER=root
-MYSQL_PASSWORD=
-MYSQL_DATABASE=chatbot
-MYSQL_PORT=3306
+Đã tạo sẵn `.env` + `.env.example` cho cả 3 project, và đã test
+`load_dotenv()` đọc đúng. Chỉ còn 2 chỗ TODO trong `be/.env`:
+`GROQ_API_KEY` và `MONGO_URI`.
 
-JWT_SECRET=doi-cai-nay-di
-GOOGLE_CLIENT_ID=          # chỉ cần nếu dùng đăng nhập Google
-FACEBOOK_APP_ID=
-FACEBOOK_APP_SECRET=
-```
+Ba chỗ dễ sai nhất:
 
-Chạy:
+| Biến | Ở đâu | Bẫy |
+|---|---|---|
+| `JWT_SECRET` | `be/.env` | Bỏ trống là `services/auth_service.py` và `services/admin_auth_service.py` fallback về chuỗi hardcode `'your-secret-key-change-this'` nằm công khai trong repo — ai cũng forge được token admin. Đã sinh sẵn giá trị random 64 ký tự. |
+| `MYSQL_PASSWORD` | `be/.env` | Phải set tường minh, kể cả khi rỗng. Default trong code **không khớp nhau**: `app.py`, `MySQL/db/__init__.py`, `services/simple_image_service.py` dùng `"123456"`; còn `MySQL/setup_mysql.py`, `config/hybrid_config.py`, `services/analytics_service.py`, `services/chatbot_service.py` dùng `""`. Bỏ trống là mỗi module connect bằng một password khác nhau. |
+| URL backend | `fe/` vs `Dashboard/` | Hai tên biến khác nhau: `fe/` dùng `VITE_API_BASE_URL=http://localhost:5000`, `Dashboard/` dùng `VITE_API_URL=http://localhost:5000/api` — **có `/api` ở cuối**. Đặt sai tên hoặc quên `/api` là Dashboard 404 hết. |
+
+Mọi biến `VITE_*` bị nhúng thẳng vào bundle frontend, ai xem source cũng
+đọc được. Chỉ để client id / public key ở đó, không để secret.
+
+File ignore của `be/` và `fe/` đang ignore cả `.env.example`. Nên bỏ dòng
+đó — template vốn để commit cho người khác biết cần biến gì. `Dashboard/`
+thì đúng, chỉ ignore `.env`.
+
+`app.py:38` set `app.config['JWT_SECRET']` nhưng không ai đọc, và default ở
+đó có lỗi typo dấu cách (`'your-secret-k ey-...'`). Dead code, xoá được.
+
+## 1c. Chạy backend
 
 ```bash
 cd be && source .venv/bin/activate && python app.py
@@ -176,3 +188,6 @@ VITE_GOOGLE_CLIENT_ID=
   cái proxy đó.
 - `ngrok-v3-stable-windows-amd64/` và các file `.bat` là của Windows, không
   dùng trên Linux.
+- **Có một Groq API key thật bị commit trong `NULL/main/notes.txt`** (bắt đầu
+  bằng `gsk_l9qE...`). Key nằm trong history nên xoá file không đủ: vào
+  https://console.groq.com/keys revoke key đó, rồi tạo key mới cho `be/.env`.
