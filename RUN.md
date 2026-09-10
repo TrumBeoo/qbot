@@ -14,6 +14,25 @@ Bản này thay cho phần "Cách chạy" trong `README.md` — README cũ đã 
 `NULL/` là code cũ/nháp — bỏ qua. `backend/` và `frontend/` đã được đổi tên
 thành `be/` và `fe/` nhưng **chưa commit** (`git status` đang thấy rename này).
 
+## Trạng thái hiện tại của máy
+
+Backend đã dựng xong và boot thật thành công. Đã làm:
+
+- `be/.venv` tạo xong, cài đủ dependency (numpy 2.3.1, torch 2.8.0+cpu)
+- `be/requirements.txt` đã sửa để cài được
+- `.env` + `.env.example` cho cả 3 project
+- MySQL 8 và MongoDB 7 chạy trong docker (`qbot-mysql`, `qbot-mongo`)
+- Tài khoản admin đã tạo trong Mongo
+- Verify sống: `/health`, `/datetime`, `/rag-stats` (20 documents)
+
+**Còn đúng 1 việc:** điền `GROQ_API_KEY` vào `be/.env`. Thiếu key thì
+`/chat` vẫn trả HTTP 200 nhưng nội dung là câu xin lỗi "đang gặp vấn đề kỹ
+thuật", còn log server ghi
+`Failed to initialize LLM: GROQ_API_KEY environment variable is required`.
+Đừng mất thời gian debug chỗ khác khi thấy câu đó.
+
+Chưa làm: `npm install` cho `fe/` và `Dashboard/`.
+
 ---
 
 ## 0. Bootstrap (máy này còn thiếu)
@@ -54,14 +73,16 @@ pip install --index-url https://download.pytorch.org/whl/cpu torch==2.8.0
 pip install -r requirements.txt edge-tts langdetect
 ```
 
-`requirements.txt` cần sửa 2 chỗ mới cài được:
+`requirements.txt` **đã được sửa 2 chỗ** (trước đó không cài được):
 
-1. **Xoá dòng `langchain-mongodb==0.2.0`.** Nó đòi `numpy<2.0.0` trong khi
-   file lại pin `numpy==2.3.1` → pip báo `ResolutionImpossible`, cài chết
-   giữa đường. Không file `.py` nào trong `be/` import `langchain_mongodb`,
-   đây là dependency chết, xoá là hết conflict.
-2. **Thêm `edge-tts` và `langdetect`.** `be/config/noi.py` import cả hai
-   nhưng requirements không có — không cài là crash lúc khởi động.
+1. **Xoá `langchain-mongodb==0.2.0`.** Nó đòi `numpy<2.0.0` trong khi file
+   lại pin `numpy==2.3.1` → pip báo `ResolutionImpossible` và bỏ dở. Không
+   file `.py` nào trong `be/` import `langchain_mongodb`, dependency chết.
+2. **Thêm `edge-tts==7.2.8` và `langdetect==1.0.9`.** `be/config/noi.py`
+   import cả hai nhưng requirements không có — không cài là crash khi boot.
+
+File gốc còn thiếu newline ở cuối, nên nếu tự `>>` append thì dòng mới sẽ
+dính vào `python-Levenshtein==0.25.1`. Đã xử lý.
 
 Cài mà không dùng trực tiếp: `googlemaps`, `fuzzywuzzy`, `Pillow` (không
 file nào import). `faiss-cpu` và `sentence-transformers` thì phải giữ —
@@ -118,16 +139,34 @@ sửa file trong `be/data/` thì gọi `POST /api/dashboard/rebuild-vectorstore`
 
 ## 2. Database
 
-App bắt exception khi init DB nên **vẫn boot được khi chưa có DB nào** — chỉ
-mất chat history, còn `/chat` (RAG + Groq) hoạt động bình thường.
+**MySQL là bắt buộc, MongoDB thì không.** Hai cái này không đối xứng nhau,
+và khối `try/except` quanh phần init DB trong `app.py` không cứu được MySQL:
 
-- **MongoDB** (users, admins, chat history): dùng MongoDB Atlas free tier rồi
-  điền `MONGO_URI`. Không set biến này thì pymongo mặc định về
-  `localhost:27017` và sẽ timeout.
-- **MySQL** (conversations/messages, legacy): chỉ cần nếu dùng
-  `/api/mysql-chat/*`. Cài local hoặc
-  `docker run -d -p 3306:3306 -e MYSQL_ALLOW_EMPTY_PASSWORD=1 mysql:8`.
-  Bảng được `be/MySQL/setup_mysql.py` tự tạo lúc app khởi động.
+- **MySQL — bắt buộc để boot.** `be/MySQL/db/__init__.py:23` tạo
+  `MySQLConnectionPool` ngay lúc import module, tức là connect luôn. Chuỗi
+  import `app.py:11` → `services/mysql_chat_service` →
+  `repositories/mysql_chat_repository` → `MySQL.db` chạy **trước** khối
+  `try/except` ở `app.py:40`, nên MySQL chết là process chết với
+  `DatabaseError: 2003 Can't connect to MySQL server`. Không phải lỗi config
+  của bạn.
+- **MongoDB — tuỳ chọn khi boot.** Kết nối được init bên trong `try/except`
+  nên Mongo tắt thì chỉ in `Warning: Could not initialize databases: ...` rồi
+  chạy tiếp. Nhưng thiếu Mongo là mất users, admins và chat history → không
+  đăng nhập Dashboard được.
+
+Dựng cả hai bằng docker, password khớp với `be/.env`:
+
+```bash
+docker run -d --name qbot-mysql -e MYSQL_ROOT_PASSWORD=123456 \
+  -e MYSQL_DATABASE=chatbot -p 3306:3306 --restart unless-stopped mysql:8
+
+docker run -d --name qbot-mongo -p 27017:27017 --restart unless-stopped mongo:7
+```
+
+MySQL mất khoảng 6s mới nhận connection, đừng chạy `app.py` ngay. Bảng được
+`be/MySQL/setup_mysql.py` tự tạo lúc app khởi động, không cần migrate tay.
+
+Lần sau chỉ cần `docker start qbot-mysql qbot-mongo`.
 
 Tạo tài khoản admin để đăng nhập Dashboard (cần MongoDB chạy trước):
 
