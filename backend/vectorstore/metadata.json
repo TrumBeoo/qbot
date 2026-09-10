@@ -1,7 +1,0 @@
-{
-  "last_build_time": 1759725807.760009,
-  "document_count": 20,
-  "embedding_model": "sentence-transformers/distiluse-base-multilingual-cased-v1",
-  "chunk_size": 1000,
-  "chunk_overlap": 200
-}
