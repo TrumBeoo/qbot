@@ -7,7 +7,7 @@ Bản này thay cho phần "Cách chạy" trong `README.md` — README cũ đã 
 
 | Thư mục     | Là gì                  | Port | Lệnh chạy      |
 |-------------|------------------------|------|----------------|
-| `be/`       | Flask API (`app.py`)   | 5000 | `python app.py`|
+| `be/`       | Flask API (`app.py`)   | 5555 | `python app.py`|
 | `fe/`       | Chat UI (React + Vite) | 3000 | `npm run dev`  |
 | `Dashboard/`| Admin UI (React + Vite)| 5173 | `npm run dev`  |
 
@@ -35,7 +35,86 @@ Chưa làm: `npm install` cho `fe/` và `Dashboard/`.
 
 ---
 
-## 0. Bootstrap (máy này còn thiếu)
+## 0. Chay bang Docker (khuyen dung)
+
+Pha 01 cua lo trinh chuyen doi da xong: toan bo stack chay bang
+`docker compose`. Day la cach nhanh nhat, khong can cai Python hay Node tren
+may.
+
+```bash
+cd ~/Code/qbot
+docker compose up -d --build      # lan dau: ~10 phut, anh be nang 2.43GB
+docker compose logs -f be
+```
+
+| Service | Cong | Ghi chu |
+|---|---|---|
+| `be` | 5555 | Flask + RAG |
+| `fe` | 3000 | Chat UI, nginx phuc vu ban build |
+| `dashboard` | 5173 | Admin UI |
+| `postgres` | 5432 | Chua dung, san cho pha 02 |
+| `mysql` | 3306 | |
+| `mongo` | 27017 | |
+
+Truoc khi `up`, dung cac tien trinh dang giu port tren host: vite dev server
+(3000, 5173), flask (5555), va container tao bang tay truoc do.
+
+Secret khong bi nhan doi: compose doc truc tiep `be/.env` qua `env_file`, chi
+ghi de nhung gia tri phu thuoc container (`MYSQL_HOST=mysql`,
+`MONGO_URI=mongodb://mongo:27017/`, `CORS_ORIGINS`, `PORT`, `FLASK_DEBUG=0`).
+`.env` o thu muc goc la tuy chon, chi de override cap compose - xem
+`.env.example`.
+
+### Ba cho da phai chua trong pha nay
+
+**Uid cua container phai khop uid host.** `be/vectorstore/` va
+`be/static/images/` la bind mount nen file mang ownership host (uid 1000).
+Ban dau image chay uid 10001 va RAG chet voi
+`could not open vectorstore/index/index.faiss for writing: Permission denied`.
+Da doi thanh build arg `APP_UID`/`APP_GID`, mac dinh 1000. May ban khac 1000
+thi dat `DOCKER_UID` trong `.env` goc - xem bang `id -u`.
+
+**Named volume giu ownership tu lan tao dau.** Neu ban tung build voi uid khac
+roi doi, volume `qbot_hfcache` van thuoc uid cu. Chua ma khong phai tai lai
+model 519MB:
+
+```bash
+docker run --rm -v qbot_hfcache:/c alpine:3 chown -R 1000:1000 /c
+docker compose restart be
+```
+
+**Bien `VITE_*` nhung vao bundle luc BUILD.** Doi URL API thi phai
+`docker compose build fe dashboard` lai, restart khong co tac dung.
+
+### Vi sao co volume cho tung thu
+
+- `hfcache` — model embedding nang 519MB. Khong cache la moi container moi
+  tai lai. Co cache thi `docker compose restart be` len trong 4 giay.
+- `./be/vectorstore` (bind mount, khong phai named volume) — dung luon FAISS
+  index da build san tren host. Cung nho vay ma index build trong container
+  ghi nguoc ra host.
+- `./be/static/images` — anh upload tu Dashboard phai song qua rebuild.
+- `pgdata`, `mysqldata`, `mongodata` — du lieu database.
+
+### Lenh hay dung
+
+```bash
+docker compose ps                       # trang thai + healthcheck
+docker compose logs -f be               # log backend
+docker compose restart be               # sau khi sua .env
+docker compose build be && docker compose up -d be   # sau khi sua code Python
+docker compose down                     # dung, giu du lieu
+docker compose down -v                  # dung va XOA het volume
+```
+
+Ca 6 service deu co healthcheck, nen `docker compose ps` bao `healthy` la
+that su phuc vu duoc, khong chi la process con song.
+
+---
+
+## 0b. Chay truc tiep tren may (khong Docker)
+
+### Bootstrap (máy này còn thiếu)
 
 Python 3.12.3 có sẵn nhưng thiếu `pip` và `venv`:
 
@@ -46,6 +125,292 @@ sudo apt install python3-pip python3.12-venv
 Node 24 + npm 11 đã có sẵn, không cần làm gì.
 
 MongoDB và MySQL **không được cài trên máy này**. Xem mục 2 để chọn cách xử lý.
+
+---
+
+## 0c. Postgres + Prisma (pha 02)
+
+Schema Postgres da xong va da co migration chay duoc. Chua co code API -
+do la pha 04.
+
+```bash
+cd api
+npm install
+cp .env.example .env          # DATABASE_URL tro localhost:5432
+npx prisma migrate deploy     # ap dung 3 migration
+npm run smoke                 # kiem tra schema bang assert that
+```
+
+`postgres` phai dang chay truoc (`docker compose up -d postgres`).
+
+**DATABASE_URL co hai gia tri khac nhau.** Chay `prisma` tu may host thi
+dung `@localhost:5432`; chay trong container thi phai la `@postgres:5432`
+(ten service trong compose). Dat sai la bao `ECONNREFUSED`.
+
+### 7 bang, khong phai 8
+
+Ke hoach ban dau uoc 8 thuc the. Dem lai thi la 7: `memory_service.py`
+khong ghi xuong DB nao ca, no chi giu trong bo nho, nen khong sinh ra bang.
+
+| Bang | Tu dau | Ghi chu |
+|---|---|---|
+| `users` | Mongo `users` | `businessInfo` va `permissions` giu `jsonb` |
+| `admins` | Mongo `admins` | Bo cot `password_salt` |
+| `conversations` | MySQL | Co khoa ngoai thuc su tro tới `users` |
+| `messages` | MySQL | `timestamp` doi ten thanh `createdAt` |
+| `locations` | MySQL | |
+| `location_images` | MySQL | |
+| `data_files` | Mongo `data` | Tai lieu nguon cho RAG |
+
+Mongo `chat_history` khong thanh bang: hinh dang quan he cua MySQL duoc
+chon lam chuan, hinh dang document bo hoan toan.
+
+### Bon thu sua vi DB dang trong
+
+- **`uuid` native** thay `VARCHAR(36)`, va id do DB sinh chu khong phai app.
+- **Khoa ngoai that.** `conversations.user_id` cu la `VARCHAR(36)` khong
+  rang buoc, ghi duoc hoi thoai tro tới user khong ton tai. Smoke test co
+  assert cho dieu nay.
+- **`timestamptz` cho moi cot thoi gian.** Code cu luu naive UTC bang
+  `datetime.utcnow()` roi render theo `Asia/Ho_Chi_Minh` - chi dung neu moi
+  nguoi cung ngam hieu cot do la UTC. `timestamptz` bo cai ngam hieu di.
+- **GIN trigram index** cho tim kiem dia diem. Truy van thuc te la
+  `LOWER(name) LIKE '%tu khoa%'`; index `FULLTEXT` cua MySQL chi phuc vu
+  `MATCH ... AGAINST` nen chua tung duoc dung tới. Index moi dat tren
+  `lower(cot)` de khop dung bieu thuc - `EXPLAIN` xac nhan planner dung no.
+
+### Khi doi schema
+
+```bash
+cd api
+# sua prisma/schema.prisma roi:
+npx prisma migrate dev --name mo_ta_ngan
+npm run smoke
+```
+
+Migration `trigram_indexes_for_like_search` la SQL viet tay (Prisma khong
+dien dat duoc index tren bieu thuc). `prisma migrate dev` khong sinh lai no,
+nhung neu ban doi ten cot `name` / `nameEn` / `keywords` thi phai sua file
+SQL do bang tay.
+
+---
+
+## 0d. AI service (pha 03)
+
+Phan AI da tach thanh service rieng `ai/`, chay FastAPI. Service NOI BO:
+khong publish port ra host, chi goi duoc tu trong mang cua compose.
+
+```bash
+docker compose up -d --build ai
+docker compose logs -f ai
+```
+
+Thu tay (token lay tu `.env` o thu muc goc):
+
+```bash
+T=$(grep '^AI_SERVICE_TOKEN=' .env | cut -d= -f2)
+docker compose exec -T be curl -s -H "Authorization: Bearer $T" http://ai:8000/rag/stats
+```
+
+### Sau endpoint
+
+| Endpoint | Lam gi |
+|---|---|
+| `POST /rag/answer` | Tra loi qua RAG. `without_rag: true` thi goi Groq truc tiep |
+| `POST /rag/search` | Tim doan tai lieu gan nhat, khong goi LLM |
+| `POST /rag/reindex` | Build lai vectorstore tu `data/` |
+| `POST /tts` | edge-tts sinh giong noi, tra base64 |
+| `POST /detect-language` | Nhan dien vi/en |
+| `POST /summarize` | Tom tat hoi thoai + rut tu khoa |
+
+Them `GET /health` (khong can token, cho docker healthcheck) va
+`GET /rag/stats`.
+
+### Ranh gioi: service khong doc database
+
+Day la dieu quan trong nhat cua pha nay. AI service khong biet Postgres,
+MySQL hay Mongo ton tai. Lich su hoi thoai duoc API nap roi **truyen vao
+trong request**:
+
+```json
+POST /rag/answer
+{
+  "question": "Con khach san thi sao?",
+  "history": [
+    {"sender": "user", "text": "Toi muon di Bai Chay 3 ngay"},
+    {"sender": "bot",  "text": "Bai Chay o Ha Long, co bai bien..."}
+  ]
+}
+```
+
+Giu duoc ranh gioi nay thi doi store, scale rieng, hay thay han service deu
+de. Da kiem chung: cau hoi khong nhac Bai Chay nhung bot van tra loi dung
+nho `history`.
+
+### Cai gi vao ai/, cai gi khong
+
+`be/RAG/` va `be/config/noi.py` **khong cham database dong nao** nen chuyen
+sang nguyen trang (`ai/rag/`, `ai/voice.py`), chi sua duong dan import va bo
+mot dong `from flask import jsonify` chua tung duoc dung.
+
+Ba module KHONG vao AI service vi chung la dieu phoi DB, khong phai AI:
+
+- `services/mongodb_rag_service.py` (221 dong) - noi lich su Mongo voi RAG
+- `services/enhanced_rag_service.py` (472 dong) - phu thuoc memory_service
+- `services/memory_service.py` (561 dong) - hien thuc mot langchain
+  `BaseChatMessageHistory` doc/ghi truc tiep MySQL
+
+Phan AI thuc su cua `memory_service` duoc viet lai thanh `ai/summarize.py`
+(~130 dong) nhan messages tu request. Cac ham `get_user_preferences`,
+`get_memory_stats`, `cleanup_old_memories` la truy van DB - viec cua API o
+pha 04.
+
+`ai/summarize.py` co self-check chay duoc:
+
+```bash
+docker compose exec -T ai python summarize.py     # in "summarize demo OK"
+```
+
+### Xac thuc
+
+Token dung chung qua `AI_SERVICE_TOKEN`, so sanh bang
+`secrets.compare_digest`. **Khong dat bien nay la service tu choi moi
+request** (503) - mac dinh mo cua la kieu loi de xay ra khi deploy. Da kiem
+chung: thieu token -> 401, token sai -> 401.
+
+### Volume
+
+- `./be/data:/app/data:ro` - **chi doc**. AI service khong sua tai lieu
+  nguon, no chi doc de build index. Sua noi dung la viec cua API.
+- `./be/vectorstore:/app/vectorstore` - ghi duoc, `/rag/reindex` build lai
+  index vao day.
+- `hfcache` - **dung chung voi `be`** de khong tai model 519MB hai lan.
+
+Ba duong dan nay van tro vao `be/` vi `be/` con song den pha 05. Khi xoa
+`app.py` thi doi thanh `ai/data` va `ai/vectorstore`.
+
+---
+
+## 0e. API TypeScript (pha 04 - dang lam)
+
+Nhom auth da xong va da kiem chung. Bon nhom con lai chua bat dau.
+
+```bash
+cd api
+npm install
+npx prisma migrate deploy
+npm run seed:admin            # ADMIN_PASSWORD=... de tu chon mat khau
+npm run build && npm start    # cong 4000
+./test-auth.sh                # 34 assert
+```
+
+Hoac qua Docker: `docker compose up -d --build api`.
+
+### Tien do pha 04
+
+| Nhom | Route | Trang thai |
+|---|---|---|
+| Auth | 8 | **Xong** - `./test-auth.sh`, 34 assert |
+| Hoi thoai + tin nhan | 11 | **Xong** - `./test-chat.sh`, 50 assert |
+| Dia diem + anh | ~8 | Chua |
+| Analytics + dashboard | ~12 | Chua |
+| Quan ly nguoi dung | ~6 | Chua |
+
+Nhom hoi thoai phuc vu CA HAI prefix `/api/chat/*` va `/api/mysql-chat/*` tu
+mot controller: ban Flask co hai blueprint rieng (mot tren Mongo, mot tren
+MySQL) va frontend goi ca hai. Gio ca hai tro ve cung bang Postgres nen
+khong con gi de dong bo - `hybrid_chat_service.py` 497 dong tro thanh vo
+nghia.
+
+`GET /api/chat/conversations/:id/summary` la cho duy nhat hien tai chung
+minh ca chuoi: API nap tin nhan tu Postgres, goi AI service, AI goi LLM.
+AI service khong doc database.
+
+Flask (`be/`, cong 5555) van chay song song. Pha 05 moi cat.
+
+### Hop dong giu y nguyen ban Flask
+
+Day la rang buoc quan trong nhat cua pha 04. Frontend hien tai:
+
+- doc `data.error` khi loi - nen co `HttpErrorFilter` dua moi loi ve
+  `{error: "..."}`. Khong co no thi Nest tra `{message: [...]}` va moi loi
+  hien thong diep mac dinh thay vi ly do that.
+- doc `user._id` (ke thua MongoDB) va tron snake_case voi camelCase
+  (`profile_picture` canh `businessInfo`). Xem `src/common/wire.ts`.
+- dua vao viec **admin duoc thu truoc user** khi dang nhap.
+
+Doi hop dong nay la viec cua pha 06, luc frontend duoc viet lai.
+
+### Ba thu lam khac ban cu
+
+**Mot kieu hash duy nhat: bcrypt** (12 vong). Ban Python co ba kieu song
+song - werkzeug, SHA-256 + salt, bcrypt. `npm run seed:admin` thay
+`be/create_admin.py`: bam bcrypt, khong hoi tuong tac (ban cu goi `input()`
+nen khong chay duoc trong container), va idempotent.
+
+**Ket noi database luoi.** `PrismaService.$connect()` goi trong
+`onModuleInit`, khong phai luc import. `be/MySQL/db/__init__.py:23` tao pool
+ngay luc import nen DB chet la process chet. `/health` cua API bao
+`database: "down"` chu khong lam sap app.
+
+**Tu choi khoi dong khi thieu JWT_SECRET.** Ban Python am tham dung chuoi
+hardcode nam trong repo.
+
+### ValidationPipe whitelist
+
+`whitelist: true` bo moi field khong khai bao trong DTO. Da kiem chung: gui
+`{"name":"X","isActive":false,"permissions":{...}}` vao `PUT /profile` thi
+`name` duoc cap nhat con `isActive` va `permissions` bi bo - client khong tu
+kich hoat lai tai khoan hay tu cap quyen duoc.
+
+---
+
+## 0f. Pha 05 - vi sao chua lam duoc
+
+Pha 05 la cat frontend sang API moi roi xoa Flask. **Chua lam duoc**, va day
+la so lieu:
+
+| | Handler |
+|---|---|
+| Flask dang phuc vu | 86 |
+| API TypeScript da co | 31 |
+
+Cat bay gio thi auth va lich su chat chay, con lai 404 het: `/chat`,
+`/voice-chat`, `/voice-welcome`, va **toan bo Dashboard** (analytics, anh,
+dia diem, quan ly nguoi dung, dong bo du lieu).
+
+Con thieu 3 nhom cua pha 04: dia diem + anh, analytics + dashboard, quan ly
+nguoi dung.
+
+### Phan cua pha 05 da lam duoc ngay
+
+Xoa code chet da kiem chung khong ai dung:
+
+- `NULL/` - code nhap, khong file nao import. Cung la cho chua API key Groq
+  bi commit. **Key van nam trong git history: phai revoke.**
+- `ngrok-v3-stable-windows-amd64/` (25MB) va `run_mongodb_test.bat` - cua
+  Windows, khong dung duoc tren Linux.
+- 10 dependency trong `fe/package.json` ma 0 file nao dung: ba goi
+  `@radix-ui/*`, `tailwindcss`, `tailwind-merge`, `tailwindcss-animate`,
+  `framer-motion`, `class-variance-authority`, `clsx`, va `vite` khai trung
+  o ca `dependencies` lan `devDependencies`. Da rebuild `fe` va verify van
+  phuc vu duoc - chung that su chet.
+
+Chua xoa `be/services/hybrid_chat_service.py`: no khong con y nghia nhung
+`be/` van la backend dang phuc vu, xoa bay gio khong duoc gi ma lai dung vao
+he dang chay. De den pha 05 that.
+
+### Hai man hinh Dashboard da vo tu truoc
+
+`Dashboard/src` goi `/api/dashboard/documents` va
+`/api/dashboard/real-analytics` - ca hai **404 ngay tren Flask hien tai**,
+khong phai do viec chuyen doi. Dung port hai endpoint nay o pha 04; can quyet
+dinh xoa man hinh do hay viet endpoint moi.
+
+Tuong tu, `fe/` goi `/api/chat/history`, `/api/chat/stats`,
+`/api/chat/export` tren prefix Mongo - ba cai nay 404 tren Flask. Ban
+TypeScript co `/api/chat/stats` va `/api/chat/export` nen thanh ra **da sua
+luon** hai cho vo nay.
 
 ---
 

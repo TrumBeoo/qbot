@@ -26,7 +26,7 @@ class RAGEngine:
                  data_dir: str = "data/", 
                  vectorstore_path: str = "vectorstore/index",
                  embedding_model: str = "sentence-transformers/distiluse-base-multilingual-cased-v1",
-                 llm_model: str = "llama-3.3-70b-versatile",
+                 llm_model: str = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
                  chunk_size: int = 1000,
                  chunk_overlap: int = 200,
                  temperature: float = 0.7):

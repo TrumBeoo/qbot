@@ -120,7 +120,7 @@ def get_ai_response(user_input: str, detected_lang: str) -> str:
             )
 
         data = {
-            "model": "llama-3.3-70b-versatile",
+            "model": os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_input}

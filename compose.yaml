@@ -1,0 +1,188 @@
+# QBot - pha 01 cua lo trinh chuyen doi.
+# Van la kien truc cu (Flask + MySQL + Mongo), nhung Postgres da co san
+# de pha 02 dung ngay. Xem RUN.md va trang lo trinh de biet cac pha sau.
+#
+#   docker compose up -d --build
+#   docker compose logs -f be
+#
+# Truoc khi chay, dung cac tien trinh dang giu port tren host:
+# vite dev server (3000 / 5173), flask (5000), va 2 container
+# qbot-mysql / qbot-mongo tao bang tay truoc do.
+
+name: qbot
+
+services:
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-qbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-qbot}
+      POSTGRES_DB: ${POSTGRES_DB:-qbot}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-qbot} -d ${POSTGRES_DB:-qbot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  mysql:
+    image: mysql:8
+    environment:
+      # Phai khop MYSQL_PASSWORD / MYSQL_DATABASE trong be/.env
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-chatbot}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+    healthcheck:
+      # Doi that su nhan connection, khong chi doi process song.
+      # MySQL 8 mat khoang 6-10s moi san sang.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  be:
+    build:
+      context: ./be
+      args:
+        # Khop uid host de container ghi duoc vao bind mount vectorstore/
+        # va static/images/. Xem `id -u` neu khong phai 1000.
+        APP_UID: ${DOCKER_UID:-1000}
+        APP_GID: ${DOCKER_GID:-1000}
+    # Secret (GROQ_API_KEY, JWT_SECRET, social login) doc tu be/.env san co,
+    # khong nhan doi sang root. File nay khong bao gio duoc commit.
+    env_file:
+      - ./be/.env
+    # Chi ghi de nhung gia tri khac khi chay trong container. Muc environment
+    # thang env_file, nen 4 dong duoi ghi de be/.env mot cach co y.
+    environment:
+      # Trong mang cua compose, host la TEN SERVICE chu khong phai localhost.
+      MYSQL_HOST: mysql
+      MONGO_URI: mongodb://mongo:27017/
+      # Postgres chua duoc code dung tới, dat san cho pha 02.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-qbot}:${POSTGRES_PASSWORD:-qbot}@postgres:5432/${POSTGRES_DB:-qbot}
+      # Trong container tat debug: reloader cua Werkzeug nap torch va model
+      # embedding lan thu hai (ton ~1GB RAM) va lo Debugger PIN.
+      FLASK_DEBUG: "0"
+      PORT: "5555"
+      # Origin cua fe va dashboard khi chay qua compose.
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173
+    ports:
+      - "5555:5555"
+    volumes:
+      # Bind mount, khong phai named volume: dung luon FAISS index da build
+      # san tren host (20 document) thay vi build lai tu dau.
+      - ./be/vectorstore:/app/vectorstore
+      # Anh upload tu Dashboard phai song qua rebuild container.
+      - ./be/static/images:/app/static/images
+      # Model embedding nang 519MB. Khong cache la tai lai moi lan tao
+      # container moi.
+      - hfcache:/cache/huggingface
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+
+  # API TypeScript (pha 04). Chay song song voi be/ trong giai doan port:
+  # pha 05 doi VITE_API_BASE_URL sang cong 4000 roi xoa be/.
+  api:
+    build: ./api
+    env_file:
+      - ./be/.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-qbot}:${POSTGRES_PASSWORD:-qbot}@postgres:5432/${POSTGRES_DB:-qbot}?schema=public
+      PORT: "4000"
+      # Cung dinh dang voi Flask. Them cong 4000 de goi truc tiep khi thu.
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173
+      AI_SERVICE_URL: http://ai:8000
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?can AI_SERVICE_TOKEN}
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+
+  # AI service: RAG, TTS, nhan dien ngon ngu (pha 03).
+  # KHONG publish port ra host: day la service noi bo, chi API goi vao.
+  # Muon thu tay thi: docker compose exec ai curl ... hoac
+  #   docker compose exec be curl -H "Authorization: Bearer $AI_SERVICE_TOKEN" http://ai:8000/health
+  ai:
+    build:
+      context: ./ai
+      args:
+        APP_UID: ${DOCKER_UID:-1000}
+        APP_GID: ${DOCKER_GID:-1000}
+    env_file:
+      - ./be/.env
+    environment:
+      # Token dung chung giua API va AI service. Khong dat la service tu choi
+      # moi request (mac dinh mo cua la kieu loi de xay ra khi deploy).
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?can AI_SERVICE_TOKEN, dat trong .env o thu muc goc}
+    volumes:
+      # data/ chi doc: AI service khong sua tai lieu nguon, no chi doc de
+      # build index. Sua noi dung la viec cua API.
+      - ./be/data:/app/data:ro
+      # vectorstore ghi duoc: /rag/reindex build lai index.
+      - ./be/vectorstore:/app/vectorstore
+      # Dung chung cache model voi be de khong tai 519MB hai lan.
+      - hfcache:/cache/huggingface
+
+  fe:
+    build:
+      context: ./fe
+      args:
+        # Bien VITE_* nhung vao bundle luc build. Trinh duyet chay tren host
+        # nen localhost:5555 tro ve port da publish cua service be.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:5555}
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        VITE_FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
+    ports:
+      - "3000:80"
+    depends_on:
+      - be
+
+  dashboard:
+    build:
+      context: ./Dashboard
+      args:
+        # Ten bien khac fe/ va co /api o cuoi - day la quy uoc cua code
+        # trong Dashboard/src/services/api.js.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5555/api}
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        VITE_FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
+    ports:
+      - "5173:80"
+    depends_on:
+      - be
+
+volumes:
+  pgdata:
+  mysqldata:
+  mongodata:
+  hfcache:

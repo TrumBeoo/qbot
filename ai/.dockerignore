@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.env
+.git/
+*.log
+# vectorstore va data den qua volume, khong bake vao anh
+vectorstore/
+data/

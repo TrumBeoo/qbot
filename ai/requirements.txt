@@ -1,0 +1,28 @@
+# Chi nhung gi AI service can. So voi be/requirements.txt da bo 11 goi:
+# Flask, flask-cors, pymongo, mysql-connector-python, PyJWT, bcrypt,
+# googlemaps, Pillow, fuzzywuzzy, python-Levenshtein, langchain-mongodb.
+# groq van vao gian tiep qua langchain-groq.
+#
+# torch cai rieng trong Dockerfile tu index CPU-only.
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-dotenv==1.1.1
+requests==2.32.4
+pytz==2025.2
+
+langchain==0.3.27
+langchain-community==0.3.27
+langchain-core==0.3.74
+langchain-groq==0.3.7
+langchain-huggingface==0.3.1
+langchain-text-splitters==0.3.9
+
+sentence-transformers==5.1.0
+faiss-cpu==1.11.0.post1
+huggingface-hub==0.34.4
+transformers==4.55.0
+numpy==2.3.1
+
+edge-tts==7.2.8
+langdetect==1.0.9

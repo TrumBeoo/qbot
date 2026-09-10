@@ -134,7 +134,7 @@ class MemoryService:
                     raise ValueError("GROQ_API_KEY environment variable is required")
                 
                 self._llm = ChatGroq(
-                    model="llama-3.3-70b-versatile",
+                    model=os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
                     temperature=0.3,  # Lower temperature for summarization
                     groq_api_key=groq_api_key,
                     max_tokens=512

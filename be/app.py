@@ -15,8 +15,19 @@ import pytz
 load_dotenv()
 
 app = Flask(__name__)
+# Origin cho phep, doc tu env dang danh sach ngan cach bang dau phay.
+# Trong Docker / khi deploy chi can doi CORS_ORIGINS, khong sua code.
+CORS_ORIGINS = [
+    o.strip() for o in os.getenv(
+        'CORS_ORIGINS',
+        'http://localhost:5173,http://127.0.0.1:5173,'
+        'http://localhost:3000,http://127.0.0.1:3000,'
+        'http://localhost:3333,http://127.0.0.1:3333'
+    ).split(',') if o.strip()
+]
+
 CORS(app, 
-     origins=['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3333'],
+     origins=CORS_ORIGINS,
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
      allow_headers=['Content-Type', 'Authorization'],
      supports_credentials=True)
@@ -1600,11 +1611,16 @@ def get_user_permissions(current_user_id, user_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    print('🚀 Chat API is ready on http://0.0.0.0:5555')
+    # Port va debug doc tu env. Trong Docker dat FLASK_DEBUG=0: reloader cua
+    # Werkzeug spawn them mot process nua, nap lai torch va model embedding
+    # 519MB lan thu hai, va lo Debugger PIN ra ngoai.
+    port = int(os.getenv('PORT', 5555))
+    debug = os.getenv('FLASK_DEBUG', '1') == '1'
+    print(f'🚀 Chat API is ready on http://0.0.0.0:{port}')
     print('🔐 Authentication endpoints available at /api/auth/*')
     print('💬 Chat history endpoints available at /api/chat/*')
     print('🧠 Memory-enhanced chat available at /chat-with-memory')
     print('🧠 Memory management endpoints available at /api/memory/*')
     print('🖼️ Image management endpoints available at /api/dashboard/images/*')
     print('📁 Data file management endpoints available at /api/dashboard/data-files/*')
-    app.run(host='0.0.0.0', port=5555, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=debug)

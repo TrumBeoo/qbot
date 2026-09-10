@@ -1,0 +1,272 @@
+// QBot - schema Postgres (pha 02 cua lo trinh chuyen doi).
+//
+// Gop tu hai store cu:
+//   MySQL   -> Conversation, Message, Location, LocationImage
+//   MongoDB -> User, Admin, DataFile
+//
+// Ca hai DB cu deu dang TRONG (0 dong / 0 doc) nen day la lan duy nhat sua
+// duoc schema mien phi. Nhung cho co y lam khac ban cu deu co comment "DOI:".
+
+generator client {
+  provider        = "prisma-client-js"
+  // postgresqlExtensions can cho khoi "extensions" o datasource duoi.
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  // pg_trgm cho phep danh index GIN len truy van LIKE '%...%'.
+  // Code cu (services/simple_image_service.py) tim dia diem bang
+  // LOWER(name) LIKE %s, va index FULLTEXT cua MySQL khong he duoc dung
+  // cho kieu truy van do.
+  extensions = [pgTrgm(map: "pg_trgm")]
+}
+
+// ============================================================
+// TAI KHOAN
+// ============================================================
+
+enum AuthProvider {
+  email
+  google
+  facebook
+}
+
+/// Nguoi dung cuoi. Tu collection Mongo "users".
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  email String @unique
+  name  String
+
+  /// DOI: cot cu ten "password" nhung noi dung la hash - doi thanh
+  /// passwordHash cho khoi hieu nham. Null khi dang nhap bang social.
+  ///
+  /// Codebase cu co BA kieu hash song song: werkzeug (models/user.py),
+  /// SHA-256 + salt (admin_auth_service.py), bcrypt
+  /// (user_management_service.py). Pha 04 chot MOT kieu la bcrypt.
+  /// SHA-256 cho mat khau la sai vi no qua nhanh, de brute-force.
+  passwordHash String?
+
+  provider   AuthProvider @default(email)
+  googleId   String?      @unique
+  facebookId String?      @unique
+
+  profilePicture String?
+  isActive       Boolean   @default(true)
+  lastLoginAt    DateTime? @db.Timestamptz(3)
+  /// Giu Json: day la du lieu tu do, hinh dang doi theo nghiep vu
+  /// (business_name, business_type, industry, phone, address). Day la cho
+  /// DUY NHAT nen dung jsonb - phan con lai la truong co dinh, dung bat
+  /// chuoc Mongo.
+  businessInfo Json?
+
+  /// Map quyen dang { "resource": ["read","write"] } do
+  /// user_management_service.py dinh nghia. Chua co rang buoc nen giu Json;
+  /// khi bo quyen on dinh thi tach thanh bang rieng.
+  permissions Json?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  conversations Conversation[]
+
+  @@index([provider])
+  @@index([isActive])
+  @@map("users")
+}
+
+/// Quan tri vien. Tu collection Mongo "admins".
+///
+/// KHUYEN NGHI cho pha 04: gop bang nay vao User voi mot cot role. Hai thuc
+/// the gan nhu trung nhau nhung keo theo hai service auth rieng
+/// (auth_service.py va admin_auth_service.py, moi cai mot kieu hash). Giu
+/// rieng o pha 02 de dung dung pham vi ke hoach - quyet dinh gop la cua ban.
+model Admin {
+  id String @id @default(uuid()) @db.Uuid
+
+  email        String @unique
+  name         String
+  passwordHash String
+
+  /// DOI: bo cot password_salt. bcrypt nhung salt vao trong chinh hash nen
+  /// cot rieng khong con y nghia.
+  role       String  @default("admin")
+  isActive   Boolean @default(true)
+  isVerified Boolean @default(false)
+
+  profilePicture String?
+
+  /// DOI: ban cu de business_name / business_type / industry / phone /
+  /// address thanh 5 cot phang, khac han cach User bo trong business_info.
+  /// Dung chung mot hinh dang cho ca hai.
+  businessInfo Json?
+
+  /// Token cap phat luc tao admin (create_admin.py).
+  apiToken     String? @unique
+  refreshToken String? @unique
+
+  lastLoginAt DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  @@map("admins")
+}
+
+// ============================================================
+// HOI THOAI
+// ============================================================
+
+enum MessageSender {
+  user
+  bot
+}
+
+/// Tu bang MySQL "conversations".
+///
+/// DOI: lich su chat cu duoc ghi vao CA HAI store - Mongo "chat_history"
+/// (danh dau primary) va MySQL conversations/messages (danh dau legacy), voi
+/// mot service 497 dong chi de dong bo hai ben. Postgres giu hinh dang quan
+/// he va bo hoan toan hinh dang document cua Mongo.
+model Conversation {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// DOI: ban cu la VARCHAR(36) khong co khoa ngoai, nen co the tro tới mot
+  /// user khong ton tai. Gio la khoa ngoai thuc su.
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title String @default("New Conversation") @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  messages Message[]
+
+  /// Index kep cho truy van "hoi thoai cua user X, moi nhat truoc".
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("conversations")
+}
+
+/// Tu bang MySQL "messages".
+model Message {
+  id String @id @default(uuid()) @db.Uuid
+
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  text     String
+  sender   MessageSender
+  language String        @default("vi") @db.VarChar(10)
+
+  /// DOI: ten cu la "timestamp", vua trung tu khoa SQL vua khong noi ro la
+  /// thoi diem gi. Doi thanh createdAt cho khop phan con lai cua schema.
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// ============================================================
+// DIA DIEM DU LICH
+// ============================================================
+
+enum LocationCategory {
+  attraction
+  hotel
+  restaurant
+  beach
+  mountain
+  cave
+  island
+  other
+}
+
+enum LocationImageType {
+  main
+  gallery
+  thumbnail
+}
+
+/// Tu bang MySQL "locations".
+model Location {
+  id Int @id @default(autoincrement())
+
+  name   String  @db.VarChar(255)
+  nameEn String? @db.VarChar(255)
+
+  category LocationCategory @default(attraction)
+  district String?          @db.VarChar(100)
+
+  description   String?
+  descriptionEn String?
+
+  latitude  Decimal? @db.Decimal(10, 8)
+  longitude Decimal? @db.Decimal(11, 8)
+
+  /// Chuoi tu khoa ngan cach bang dau phay, dung cho tim kiem mo.
+  keywords String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  images LocationImage[]
+
+  @@index([category])
+  @@index([district])
+  @@map("locations")
+}
+
+/// Tu bang MySQL "location_images".
+model LocationImage {
+  id Int @id @default(autoincrement())
+
+  locationId Int
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  imageUrl  String            @db.VarChar(500)
+  imageType LocationImageType @default(gallery)
+
+  caption   String? @db.VarChar(255)
+  captionEn String? @db.VarChar(255)
+
+  displayOrder Int     @default(0)
+  isActive     Boolean @default(true)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  /// Truy van thuc te luon loc isActive roi sap theo displayOrder.
+  @@index([locationId, isActive, displayOrder])
+  @@map("location_images")
+}
+
+// ============================================================
+// TAI LIEU NGUON CHO RAG
+// ============================================================
+
+enum DataFileStatus {
+  active
+  archived
+}
+
+/// Tu collection Mongo "data". Cac file .txt trong be/data/ duoc dong bo len
+/// day de Dashboard sua duoc noi dung ma khong phai SSH vao server.
+///
+/// Van la nguon su that cho vectorstore: sua o day thi phai goi rebuild
+/// vectorstore, va Python service la ben lam viec do.
+model DataFile {
+  id String @id @default(uuid()) @db.Uuid
+
+  filename String @unique @db.VarChar(255)
+  content  String
+
+  /// Hash noi dung, de biet file co that su doi truoc khi rebuild vectorstore.
+  fileHash String @db.VarChar(64)
+  fileSize Int
+
+  status DataFileStatus @default(active)
+
+  /// line_count, word_count, last_modified - so lieu dan xuat, khong truy van.
+  metadata Json?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  syncedAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  @@index([status])
+  @@map("data_files")
+}
