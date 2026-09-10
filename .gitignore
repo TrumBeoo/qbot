@@ -1,0 +1,79 @@
+# ============================================================
+# Python (be/)
+# ============================================================
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+develop-eggs/
+dist-python/
+eggs/
+.eggs/
+wheels/
+*.egg-info/
+*.egg
+
+# Test / lint cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ============================================================
+# Node (fe/, Dashboard/, root)
+# ============================================================
+node_modules/
+.pnp
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# ============================================================
+# Secrets — KHONG BAO GIO commit
+# ============================================================
+.env
+.env.local
+.env.*.local
+# .env.example thi PHAI commit, dung ignore no
+
+# ============================================================
+# Model / data artifact nang
+# ============================================================
+.cache/
+*.pt
+*.bin
+*.onnx
+
+# Vectorstore FAISS dang duoc commit co y (be/vectorstore/index/) de khong
+# phai build lai. Muon bo ra thi un-comment dong duoi.
+# be/vectorstore/index/
+
+# Anh upload tu Dashboard
+be/static/uploads/
+
+# ============================================================
+# Tool / OS
+# ============================================================
+ngrok-v3-stable-windows-amd64/
+ngrok.exe
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Worktree cua Claude Code
+.claude/worktrees/
