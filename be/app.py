@@ -1600,11 +1600,11 @@ def get_user_permissions(current_user_id, user_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    print('🚀 Chat API is ready on http://0.0.0.0:5000')
+    print('🚀 Chat API is ready on http://0.0.0.0:5555')
     print('🔐 Authentication endpoints available at /api/auth/*')
     print('💬 Chat history endpoints available at /api/chat/*')
     print('🧠 Memory-enhanced chat available at /chat-with-memory')
     print('🧠 Memory management endpoints available at /api/memory/*')
     print('🖼️ Image management endpoints available at /api/dashboard/images/*')
     print('📁 Data file management endpoints available at /api/dashboard/data-files/*')
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5555, debug=True)
