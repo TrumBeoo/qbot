@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+
+    // Vite tu transpile; tsc chi de kiem tra kieu.
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // ---- Di chuyen tiem tien ----
+    // allowJs: .jsx va .ts song song trong cung mot cay import.
+    "allowJs": true,
+    // checkJs TAT: bat len la vai nghin loi trong 92 file chua co kieu nao.
+    "checkJs": false,
+    // strict TAT o buoc dau. Siet dan theo tung nhom file da chuyen:
+    // bat strict khi con it .jsx, hoac dat "strict": true trong mot
+    // tsconfig rieng chi include thu muc da chuyen xong.
+    "strict": false,
+    // Ba cai nay bat duoc ngay ma khong sinh nhieu loi, va bat duoc dung
+    // loai bug hay gap khi doi tu JS.
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

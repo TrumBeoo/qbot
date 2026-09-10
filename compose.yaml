@@ -5,6 +5,10 @@
 #   docker compose up -d --build
 #   docker compose logs -f be
 #
+# Moi service co restart: unless-stopped. Khong co no thi khi mot dependency
+# duoc recreate (vi du postgres), service phu thuoc chet va nam im - da gap
+# dung truong hop nay voi `api` (Exited 255).
+#
 # Truoc khi chay, dung cac tien trinh dang giu port tren host:
 # vite dev server (3000 / 5173), flask (5000), va 2 container
 # qbot-mysql / qbot-mongo tao bang tay truoc do.
@@ -14,6 +18,7 @@ name: qbot
 services:
 
   postgres:
+    restart: unless-stopped
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-qbot}
@@ -30,6 +35,7 @@ services:
       retries: 6
 
   mysql:
+    restart: unless-stopped
     image: mysql:8
     environment:
       # Phai khop MYSQL_PASSWORD / MYSQL_DATABASE trong be/.env
@@ -49,6 +55,7 @@ services:
       start_period: 30s
 
   mongo:
+    restart: unless-stopped
     image: mongo:7
     ports:
       - "27017:27017"
@@ -61,6 +68,7 @@ services:
       retries: 6
 
   be:
+    restart: unless-stopped
     build:
       context: ./be
       args:
@@ -110,6 +118,7 @@ services:
   # API TypeScript (pha 04). Chay song song voi be/ trong giai doan port:
   # pha 05 doi VITE_API_BASE_URL sang cong 4000 roi xoa be/.
   api:
+    restart: unless-stopped
     build: ./api
     env_file:
       - ./be/.env
@@ -133,6 +142,7 @@ services:
   # Muon thu tay thi: docker compose exec ai curl ... hoac
   #   docker compose exec be curl -H "Authorization: Bearer $AI_SERVICE_TOKEN" http://ai:8000/health
   ai:
+    restart: unless-stopped
     build:
       context: ./ai
       args:
@@ -154,6 +164,7 @@ services:
       - hfcache:/cache/huggingface
 
   fe:
+    restart: unless-stopped
     build:
       context: ./fe
       args:
@@ -168,6 +179,7 @@ services:
       - be
 
   dashboard:
+    restart: unless-stopped
     build:
       context: ./Dashboard
       args:

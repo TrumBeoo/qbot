@@ -414,6 +414,69 @@ luon** hai cho vo nay.
 
 ---
 
+## 0g. JSX sang TSX (pha 06 - dang lam)
+
+Lop service da chuyen xong o ca hai app. Component thi chua.
+
+```bash
+cd fe && npm run typecheck      # 0 loi
+cd Dashboard && npm run typecheck
+```
+
+### Cach di chuyen tiem tien
+
+`tsconfig.json` o ca hai app dat:
+
+- `allowJs: true` - `.jsx` va `.ts` song song trong cung cay import
+- `checkJs: false` - bat len la vai nghin loi trong 92 file chua co kieu nao
+- `strict: false` - siet dan ve sau, khong phai ngay hom nay
+- Nhung `noImplicitReturns` va `noFallthroughCasesInSwitch` bat NGAY: hai
+  cai nay khong sinh nhieu loi ma bat dung loai bug hay gap khi doi tu JS
+
+Siet dan the nao: khi con it `.jsx`, bat `strict: true`. Hoac som hon, tao
+mot `tsconfig.strict.json` chi `include` thu muc da chuyen xong.
+
+### Da chuyen
+
+| File | Dong | Ghi chu |
+|---|---|---|
+| `fe/src/types/api.ts` | 154 | MOI - hinh dang hop dong API |
+| `fe/src/services/api_chat.ts` | 152 | Viet lai co kieu day du |
+| `fe/src/services/api_voice.ts` | 235 | Doi ten + khai bao field |
+| `fe/src/services/authService.ts` | 305 | Doi ten + khai bao field |
+| `fe/src/services/chatHistoryService.ts` | 343 | Doi ten |
+| `Dashboard/src/types/api.ts` | 95 | MOI |
+| `Dashboard/src/services/api.ts` | 165 | Viet lai, moi ham co `AxiosResponse<T>` |
+
+Con lai: 34 file `.jsx` o `fe/`, 52 o `Dashboard/`. Chua bat dau.
+De `ChatbotManagement.jsx` (1.254 dong) lai cuoi cung.
+
+### Nguon su that cua kieu
+
+`fe/src/types/api.ts` va `Dashboard/src/types/api.ts` viet TAY de khop
+`api/src/common/wire.ts`. Doi hinh dang o wire.ts thi phai doi ca hai file
+nay. Cach dung hon la mot package dung chung, hoac sinh kieu tu OpenAPI -
+de khi con nhieu hon hai cho phai dong bo.
+
+Nhieu ten field trong do trong la (`user._id`, `profile_picture` canh
+`businessInfo`, `message.timestamp` thay vi `created_at`). Khong phai loi go:
+hop dong giu y nguyen ban Flask de pha 05 cat duoc bang mot dong doi bien
+moi truong.
+
+### Hai thu tim ra nho bat dau bang lop service
+
+**`mysqlConversationService.js` la 442 dong code chet.** No `import
+{ API_BASE_URL } from '../config/api'` nhung `fe/src/config/` khong ton tai,
+va khong file nao import service nay. Vite tree-shake nen build van qua -
+loi chi lo ra khi co ai do import that. Da xoa.
+
+**`api_voice` doc dung field `audio`.** Toi tuong day la bug va da "sua"
+thanh `audio_base64`, roi goi that `POST /voice-chat` moi thay Flask tra
+`{status, response, language, audio}`. Da hoan lai. Endpoint `/tts` cua AI
+service o pha 03 moi dung ten `audio_base64` - hai endpoint khac nhau.
+
+---
+
 ## 1. Backend
 
 > **Bắt buộc dùng venv.** Ubuntu 24.04 chặn cài package system-wide
