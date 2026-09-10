@@ -18,10 +18,10 @@ thành `be/` và `fe/` nhưng **chưa commit** (`git status` đang thấy rename
 
 ## 0. Bootstrap (máy này còn thiếu)
 
-Python 3.12.3 có sẵn nhưng **không có `pip` và không có `venv`**:
+Python 3.12.3 có sẵn nhưng thiếu `pip` và `venv`:
 
 ```bash
-sudo apt install python3.12-venv
+sudo apt install python3-pip python3.12-venv
 ```
 
 Node 24 + npm 11 đã có sẵn, không cần làm gì.
@@ -32,16 +32,33 @@ MongoDB và MySQL **không được cài trên máy này**. Xem mục 2 để ch
 
 ## 1. Backend
 
+> **Bắt buộc dùng venv.** Ubuntu 24.04 chặn cài package system-wide
+> (PEP 668). Gõ `pip install ...` khi chưa `activate` venv sẽ ra lỗi
+> `error: externally-managed-environment`. Đừng chữa bằng
+> `--break-system-packages`, chỉ cần vào venv.
+
 ```bash
 cd be
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install edge-tts langdetect     # thiếu trong requirements.txt, code có import
+source .venv/bin/activate     # <-- bỏ dòng này là gặp PEP 668
 ```
 
-Cài mất khá lâu và tốn ~2–3 GB: `torch` + `sentence-transformers` +
-`transformers` đều nằm trong requirements (dùng cho embedding của RAG).
+Dấu hiệu đã vào venv đúng: prompt có tiền tố `(.venv)`, và
+`which pip` trả về `.../be/.venv/bin/pip` chứ không phải `/usr/bin/pip`.
+
+Máy này không có GPU NVIDIA nên cài torch bản CPU-only, nhẹ hơn khoảng
+2.5 GB vì không kéo theo mớ wheel CUDA không dùng tới:
+
+```bash
+pip install --index-url https://download.pytorch.org/whl/cpu torch==2.8.0
+pip install -r requirements.txt edge-tts langdetect
+```
+
+`edge-tts` và `langdetect` bị thiếu trong `requirements.txt` nhưng
+`be/config/noi.py` có import — không cài là crash lúc khởi động.
+
+Thêm `.venv/` vào `be/.gitignore` (file đó đang là gitignore kiểu Node, chưa
+ignore venv của Python).
 
 Tạo `be/.env`:
 
