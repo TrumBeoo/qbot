@@ -1,6 +1,32 @@
 {
-  "dependencies": {
-    "@react-google-maps/api": "^2.20.7",
-    "node-fetch": "^3.3.2"
+  "name": "qbot",
+  "private": true,
+  "packageManager": "pnpm@9.7.0",
+  "description": "Chatbot du l\u1ecbch Qu\u1ea3ng Ninh. Ch\u1ea1y to\u00e0n b\u1ed9 stack: pnpm dev",
+  "scripts": {
+    "dev": "concurrently -n be,fe,dash -c cyan,green,magenta \"pnpm dev:be\" \"pnpm dev:fe\" \"pnpm dev:dash\"",
+    "dev:be": "pnpm -C be dev",
+    "dev:fe": "pnpm -C fe dev",
+    "dev:dash": "pnpm -C Dashboard dev",
+    "infra": "docker compose up -d postgres mysql mongo ai legacy",
+    "infra:stop": "docker compose stop",
+    "db": "docker compose up -d postgres mysql mongo",
+    "ai": "docker compose up -d ai",
+    "legacy": "docker compose up -d legacy",
+    "docker": "docker compose up --build",
+    "docker:bg": "docker compose up -d --build",
+    "stop": "docker compose down",
+    "reset": "docker compose down -v",
+    "logs": "docker compose logs -f",
+    "ps": "docker compose ps",
+    "setup": "pnpm -C be install && pnpm -C fe install && pnpm -C Dashboard install",
+    "typecheck": "pnpm -C be typecheck && pnpm -C fe typecheck && pnpm -C Dashboard typecheck",
+    "test": "pnpm -C be test",
+    "build": "pnpm -C be build && pnpm -C fe build && pnpm -C Dashboard build",
+    "migrate": "pnpm -C be migrate:deploy",
+    "seed": "pnpm -C be seed:admin"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }

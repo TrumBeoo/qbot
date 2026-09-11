@@ -1,4 +1,17 @@
 {
-    "codium.codeCompletion.enable": false,
-    "CodeGPT.apiKey": "Anthropic"
+  "codium.codeCompletion.enable": false,
+  "CodeGPT.apiKey": "Anthropic",
+  "typescript.tsdk": "server/api/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.venv/**": true,
+    "**/dist/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.venv": true,
+    "**/dist": true,
+    "**/pnpm-lock.yaml": true
+  }
 }

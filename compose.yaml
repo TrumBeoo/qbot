@@ -67,21 +67,21 @@ services:
       timeout: 5s
       retries: 6
 
-  be:
+  legacy:
     restart: unless-stopped
     build:
-      context: ./be
+      context: ./legacy
       args:
         # Khop uid host de container ghi duoc vao bind mount vectorstore/
         # va static/images/. Xem `id -u` neu khong phai 1000.
         APP_UID: ${DOCKER_UID:-1000}
         APP_GID: ${DOCKER_GID:-1000}
-    # Secret (GROQ_API_KEY, JWT_SECRET, social login) doc tu be/.env san co,
-    # khong nhan doi sang root. File nay khong bao gio duoc commit.
+    # Secret doc tu MOT root .env dung chung cho legacy, be va ai.
+    # File do khong bao gio duoc commit.
     env_file:
-      - ./be/.env
+      - ./.env
     # Chi ghi de nhung gia tri khac khi chay trong container. Muc environment
-    # thang env_file, nen 4 dong duoi ghi de be/.env mot cach co y.
+    # thang env_file, nen may dong duoi ghi de .env mot cach co y.
     environment:
       # Trong mang cua compose, host la TEN SERVICE chu khong phai localhost.
       MYSQL_HOST: mysql
@@ -92,19 +92,18 @@ services:
       # embedding lan thu hai (ton ~1GB RAM) va lo Debugger PIN.
       FLASK_DEBUG: "0"
       PORT: "5555"
+      # legacy goi ai/ qua HTTP thay vi mang ban copy code AI.
+      AI_SERVICE_URL: http://ai:8000
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?can AI_SERVICE_TOKEN}
       # Origin cua fe va dashboard khi chay qua compose.
       CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173
     ports:
       - "5555:5555"
     volumes:
-      # Bind mount, khong phai named volume: dung luon FAISS index da build
-      # san tren host (20 document) thay vi build lai tu dau.
-      - ./be/vectorstore:/app/vectorstore
-      # Anh upload tu Dashboard phai song qua rebuild container.
-      - ./be/static/images:/app/static/images
-      # Model embedding nang 519MB. Khong cache la tai lai moi lan tao
-      # container moi.
-      - hfcache:/cache/huggingface
+      # Chi con anh upload tu Dashboard. legacy khong doc data/ hay
+      # vectorstore/ nua (goi ai/ qua HTTP), va khong con model embedding
+      # nen cung khong can hfcache.
+      - ./legacy/static/images:/app/static/images
     depends_on:
       mysql:
         condition: service_healthy
@@ -117,11 +116,11 @@ services:
 
   # API TypeScript (pha 04). Chay song song voi be/ trong giai doan port:
   # pha 05 doi VITE_API_BASE_URL sang cong 4000 roi xoa be/.
-  api:
+  be:
     restart: unless-stopped
-    build: ./api
+    build: ./be
     env_file:
-      - ./be/.env
+      - ./.env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-qbot}:${POSTGRES_PASSWORD:-qbot}@postgres:5432/${POSTGRES_DB:-qbot}?schema=public
       PORT: "4000"
@@ -149,7 +148,7 @@ services:
         APP_UID: ${DOCKER_UID:-1000}
         APP_GID: ${DOCKER_GID:-1000}
     env_file:
-      - ./be/.env
+      - ./.env
     environment:
       # Token dung chung giua API va AI service. Khong dat la service tu choi
       # moi request (mac dinh mo cua la kieu loi de xay ra khi deploy).
@@ -157,9 +156,9 @@ services:
     volumes:
       # data/ chi doc: AI service khong sua tai lieu nguon, no chi doc de
       # build index. Sua noi dung la viec cua API.
-      - ./be/data:/app/data:ro
+      - ./ai/data:/app/data:ro
       # vectorstore ghi duoc: /rag/reindex build lai index.
-      - ./be/vectorstore:/app/vectorstore
+      - ./ai/vectorstore:/app/vectorstore
       # Dung chung cache model voi be de khong tai 519MB hai lan.
       - hfcache:/cache/huggingface
 

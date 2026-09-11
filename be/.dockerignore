@@ -1,19 +1,5 @@
-.venv/
-venv/
-__pycache__/
-*.py[cod]
+node_modules/
+dist/
 .env
-.env.example
 .git/
-.pytest_cache/
 *.log
-
-# Test va script dung tay, khong can trong anh
-test_*.py
-debug_*.py
-migrate_mongo_to_mysql.py
-setup_hybrid_system.py
-
-# Vectorstore va anh upload di qua volume, khong bake vao anh
-vectorstore/
-static/images/uploads/

@@ -172,7 +172,12 @@ const AdvancedCharts = ({ analyticsData }) => {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percentage }) => `${name} (${percentage}%)`}
+                  // percentage la field cua chinh du lieu (tinh o tren), khong
+                  // phai cua recharts. PieLabelRenderProps khong khai bao field
+                  // tuy y nen phai chi kieu ro rang.
+                  label={({ name, percentage }: { name?: string; percentage?: number }) =>
+                    `${name} (${percentage}%)`
+                  }
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"

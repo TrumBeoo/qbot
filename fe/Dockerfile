@@ -4,8 +4,13 @@
 FROM node:22-slim AS build
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci
+# corepack kich hoat pnpm dung phien ban ghi trong "packageManager".
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml ./
+# --frozen-lockfile: build that bai neu lockfile lech package.json, thay vi
+# am tham cai phien ban khac voi may dev.
+RUN pnpm install --frozen-lockfile
 
 COPY . .
 
@@ -18,7 +23,7 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL \
     VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID \
     VITE_FACEBOOK_APP_ID=$VITE_FACEBOOK_APP_ID
 
-RUN npm run build
+RUN pnpm build
 
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf

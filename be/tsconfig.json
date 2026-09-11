@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    // "node" (= node10) la cach resolve cua CommonJS, dung cho NestJS.
+    //
+    // TypeScript 7 se bo no. Da thu doi sang "node16": TS resolve rxjs vao
+    // file .ts NGUON thay vi declaration va sinh 20 loi trong node_modules
+    // (thieu DOM lib). Giu "node" den khi NestJS ho tro ESM.
+    //
+    // Da bo "baseUrl": no chi co y nghia khi co "paths", ma project nay
+    // khong dung path alias nao.
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "sourceMap": true,
+    "declaration": false,
+    "removeComments": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

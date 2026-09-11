@@ -85,7 +85,10 @@ class RAGEngine:
                     model=self.llm_model,
                     temperature=self.temperature,
                     groq_api_key=groq_api_key,
-                    max_tokens=1024
+                    # 1024 vuot han muc free tier cua Groq (1000 output token
+                    # moi phut), nen MOI request RAG deu tra 429. Doc tu env de
+                    # nang len khi doi goi tra phi.
+                    max_tokens=int(os.getenv('GROQ_MAX_TOKENS', 800))
                 )
                 logger.info(f"Initialized LLM: {self.llm_model}")
             except Exception as e:
